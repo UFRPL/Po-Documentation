@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>United Fashion &amp; Retail Pvt. Ltd.</title>
+<style>
+:root{
+  --navy:#1B3080;
+  --navy-dark:#0F1E52;
+  --navy-mid:#162564;
+  --navy-light:#2a4296;
+  --red:#D42027;
+  --gold:#F5A800;
+  --gold-light:#FFF3CC;
+  --white:#FFFFFF;
+  --light:#F4F6FB;
+  --border:#DDE3F0;
+  --text:#111827;
+  --muted:#6B7280;
+  --shadow:0 4px 24px rgba(27,48,128,.13);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',Arial,sans-serif;background:var(--light);color:var(--text);min-height:100vh;display:flex;flex-direction:column}
+
+/* ── TOP STRIP ─────────────────────── */
+.strip{background:var(--red);height:4px;width:100%}
+
+/* ── HEADER ────────────────────────── */
+.site-header{background:var(--navy);padding:0 40px;height:60px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 2px 12px rgba(0,0,0,.25)}
+.site-header .company{color:#fff;font-size:13px;font-weight:500;opacity:.8;letter-spacing:.4px}
+.site-header .tagline{color:var(--gold);font-size:11px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase}
+
+/* ── HERO ───────────────────────────── */
+.hero{background:linear-gradient(160deg,var(--navy-dark) 0%,var(--navy) 55%,var(--navy-light) 100%);padding:64px 20px 100px;text-align:center;position:relative;overflow:hidden;flex-shrink:0}
+.hero::before{content:'';position:absolute;top:-60%;left:-50%;width:200%;height:200%;background:radial-gradient(ellipse at 50% 30%,rgba(245,168,0,.1) 0%,transparent 60%);pointer-events:none}
+.hero::after{content:'';position:absolute;bottom:0;left:0;width:100%;height:50px;background:var(--light);clip-path:ellipse(55% 100% at 50% 100%)}
+.hero-logo{width:130px;height:auto;margin-bottom:24px;filter:drop-shadow(0 6px 20px rgba(0,0,0,.35));position:relative;z-index:1}
+.hero h1{color:#fff;font-size:2.1rem;font-weight:800;letter-spacing:.5px;line-height:1.25;margin-bottom:10px;position:relative;z-index:1}
+.hero h1 em{color:var(--gold);font-style:normal}
+.hero-sub{color:rgba(255,255,255,.6);font-size:12px;letter-spacing:2.5px;text-transform:uppercase;position:relative;z-index:1}
+.hero-badges{display:flex;gap:10px;justify-content:center;margin-top:18px;flex-wrap:wrap;position:relative;z-index:1}
+.badge{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.75);font-size:11px;padding:5px 14px;border-radius:20px;letter-spacing:.5px}
+
+/* ── PORTAL CARD ────────────────────── */
+.portal-wrap{max-width:500px;margin:-52px auto 44px;padding:0 20px;position:relative;z-index:10}
+.portal-card{background:var(--white);border-radius:18px;box-shadow:0 10px 50px rgba(27,48,128,.2);padding:40px 36px;text-align:center}
+.portal-card h2{font-size:19px;font-weight:700;color:var(--navy);margin-bottom:6px}
+.portal-card p{color:var(--muted);font-size:13px;margin-bottom:32px;line-height:1.6}
+
+/* Divider */
+.or-divider{display:flex;align-items:center;gap:10px;margin:28px 0}
+.or-divider::before,.or-divider::after{content:'';flex:1;height:1px;background:var(--border)}
+.or-divider span{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:2px}
+
+/* Select */
+.select-wrap{position:relative;margin-bottom:16px}
+.select-wrap select{width:100%;padding:14px 44px 14px 16px;border:2px solid var(--border);border-radius:10px;font-size:15px;font-weight:600;color:var(--text);background:var(--white);appearance:none;-webkit-appearance:none;cursor:pointer;transition:border .2s,box-shadow .2s;outline:none}
+.select-wrap select:focus{border-color:var(--navy);box-shadow:0 0 0 3px rgba(27,48,128,.1)}
+.select-wrap select option[value=""]{color:var(--muted)}
+.select-arrow{position:absolute;right:14px;top:50%;transform:translateY(-50%);pointer-events:none;color:var(--muted)}
+.select-arrow svg{width:16px;height:16px}
+
+/* Go Button */
+.btn-go{width:100%;padding:14px;background:var(--navy);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;letter-spacing:.5px;transition:background .2s,transform .1s,box-shadow .2s;box-shadow:0 4px 18px rgba(27,48,128,.28);display:flex;align-items:center;justify-content:center;gap:8px}
+.btn-go:hover:not(:disabled){background:var(--navy-dark);transform:translateY(-1px);box-shadow:0 6px 22px rgba(27,48,128,.38)}
+.btn-go:active{transform:translateY(0)}
+.btn-go:disabled{background:#9AA8D0;cursor:not-allowed;box-shadow:none}
+.btn-go svg{width:16px;height:16px;transition:transform .2s}
+.btn-go:hover:not(:disabled) svg{transform:translateX(3px)}
+
+/* ── BRAND CARDS ────────────────────── */
+.brands-wrap{max-width:900px;margin:0 auto 56px;padding:0 20px}
+.section-label{text-align:center;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:2.5px;margin-bottom:20px}
+.brands-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.brand-card{background:var(--white);border:2px solid var(--border);border-radius:14px;padding:26px 18px 22px;text-align:center;cursor:pointer;transition:all .22s;position:relative;overflow:hidden}
+.brand-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;opacity:0;transition:opacity .22s}
+.brand-card:hover{border-color:transparent;box-shadow:0 8px 32px rgba(27,48,128,.16);transform:translateY(-3px)}
+.brand-card:hover::before{opacity:1}
+.brand-card.reliance::before{background:linear-gradient(90deg,#4f7ef7,#22d3ee)}
+.brand-card.styleunion::before{background:linear-gradient(90deg,#1A237E,#3949AB)}
+.brand-card.max::before{background:linear-gradient(90deg,#1a56db,#0e9f6e)}
+.brand-icon{width:52px;height:52px;border-radius:14px;margin:0 auto 14px;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:#fff;letter-spacing:-.5px}
+.brand-card.reliance .brand-icon{background:linear-gradient(135deg,#4f7ef7,#22d3ee)}
+.brand-card.styleunion .brand-icon{background:linear-gradient(135deg,#1A237E,#3949AB)}
+.brand-card.max .brand-icon{background:linear-gradient(135deg,#1a56db,#0e9f6e)}
+.brand-name{font-size:15px;font-weight:700;color:var(--navy);margin-bottom:6px}
+.brand-desc{font-size:11.5px;color:var(--muted);line-height:1.6}
+.brand-tag{display:inline-block;margin-top:10px;font-size:10px;font-weight:700;color:var(--gold);background:var(--gold-light);border:1px solid rgba(245,168,0,.3);padding:3px 10px;border-radius:20px;text-transform:uppercase;letter-spacing:.8px}
+
+/* ── INFO STRIP ─────────────────────── */
+.info-strip{background:var(--white);border-top:1px solid var(--border);border-bottom:1px solid var(--border);padding:18px 20px;margin-bottom:56px}
+.info-inner{max-width:900px;margin:0 auto;display:flex;gap:0;justify-content:space-around;flex-wrap:wrap}
+.info-item{text-align:center;padding:0 20px}
+.info-icon{font-size:20px;margin-bottom:6px}
+.info-label{font-size:11px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.8px}
+.info-desc{font-size:12px;color:var(--muted);margin-top:2px}
+
+/* ── FOOTER ─────────────────────────── */
+footer{background:var(--navy-dark);color:rgba(255,255,255,.45);text-align:center;padding:22px 20px;font-size:12px;margin-top:auto}
+footer strong{color:var(--gold);font-weight:600}
+
+@media(max-width:640px){
+  .hero h1{font-size:1.5rem}
+  .hero-logo{width:100px}
+  .portal-card{padding:28px 20px}
+  .brands-grid{grid-template-columns:1fr}
+  .site-header .company{font-size:11px}
+}
+</style>
+</head>
+<body>
+
+<div class="strip"></div>
+
+<header class="site-header">
+  <span class="company">United Fashion and Retail Pvt. Ltd.</span>
+  <span class="tagline">Supplier Portal</span>
+</header>
+
+<section class="hero">
+  <img src="logo.png" alt="United Logo" class="hero-logo"
+       onerror="this.style.display='none'">
+  <h1>United Fashion <em>&amp;</em><br>Retail Pvt. Ltd.</h1>
+  <p class="hero-sub">PO Management &amp; Documentation Portal</p>
+  <div class="hero-badges">
+    <span class="badge">Invoice Generation</span>
+    <span class="badge">Packing List</span>
+    <span class="badge">Carton Sticker</span>
+  </div>
+</section>
+
+<section class="portal-wrap">
+  <div class="portal-card">
+    <h2>Select Brand Portal</h2>
+    <p>Choose your retail partner below to access the<br>PO upload and documentation workspace.</p>
+
+    <div class="select-wrap">
+      <select id="brandSelect" onchange="onBrandChange()">
+        <option value="">— Choose a brand —</option>
+        <option value="reliance/index.html">Reliance</option>
+        <option value="styleunion/index.html">Style Union</option>
+        <option value="max/index.html">Max</option>
+      </select>
+      <span class="select-arrow">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <polyline points="6 9 12 15 18 9"/>
+        </svg>
+      </span>
+    </div>
+
+    <button class="btn-go" id="goBtn" disabled onclick="goToPortal()">
+      Open Portal
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <line x1="5" y1="12" x2="19" y2="12"/>
+        <polyline points="12 5 19 12 12 19"/>
+      </svg>
+    </button>
+
+    <div class="or-divider"><span>or click a brand directly</span></div>
+  </div>
+</section>
+
+<section class="brands-wrap">
+  <p class="section-label">Available Portals</p>
+  <div class="brands-grid">
+    <div class="brand-card reliance" onclick="navigate('reliance/index.html')">
+      <div class="brand-icon">R</div>
+      <div class="brand-name">Reliance</div>
+      <div class="brand-desc">Invoice · Packing List<br>Carton Sticker · PO Upload</div>
+      <span class="brand-tag">Active</span>
+    </div>
+    <div class="brand-card styleunion" onclick="navigate('styleunion/index.html')">
+      <div class="brand-icon">SU</div>
+      <div class="brand-name">Style Union</div>
+      <div class="brand-desc">Invoice · Packing List<br>Carton Sticker · PO Upload</div>
+      <span class="brand-tag">Active</span>
+    </div>
+    <div class="brand-card max" onclick="navigate('max/index.html')">
+      <div class="brand-icon">M</div>
+      <div class="brand-name">Max</div>
+      <div class="brand-desc">Invoice · Packing List<br>Carton Sticker · PO Upload</div>
+      <span class="brand-tag">Active</span>
+    </div>
+  </div>
+</section>
+
+<div class="info-strip">
+  <div class="info-inner">
+    <div class="info-item">
+      <div class="info-icon">📄</div>
+      <div class="info-label">Upload PO</div>
+      <div class="info-desc">PDF Purchase Orders</div>
+    </div>
+    <div class="info-item">
+      <div class="info-icon">🧾</div>
+      <div class="info-label">Invoice</div>
+      <div class="info-desc">Auto-generated invoices</div>
+    </div>
+    <div class="info-item">
+      <div class="info-icon">📦</div>
+      <div class="info-label">Packing List</div>
+      <div class="info-desc">Itemised packing details</div>
+    </div>
+    <div class="info-item">
+      <div class="info-icon">🏷️</div>
+      <div class="info-label">Carton Sticker</div>
+      <div class="info-desc">Print-ready labels</div>
+    </div>
+  </div>
+</div>
+
+<footer>
+  &copy; 2025 <strong>United Fashion and Retail Pvt. Ltd.</strong> — All rights reserved
+</footer>
+
+<script>
+function onBrandChange(){
+  const sel=document.getElementById('brandSelect');
+  document.getElementById('goBtn').disabled=!sel.value;
+}
+function goToPortal(){
+  const sel=document.getElementById('brandSelect');
+  if(sel.value) window.location.href=sel.value;
+}
+function navigate(path){
+  window.location.href=path;
+}
+</script>
+</body>
+</html>
