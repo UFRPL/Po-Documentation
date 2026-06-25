@@ -1672,12 +1672,16 @@ function makePackingList(locsData,poData,maxPcs,ppWt,boxWt){
     for(let r=10;r<=newTotIdx;r++) ws['!rows'][r]={hpt:ch}; // carton+totals rows
   });
 
-  // Remove sheets that were not filled (i.e. no matching location was passed in)
+  // Build a fresh workbook with only the sheets that were actually filled,
+  // instead of mutating the template — deleting sheets from an xlsx template
+  // leaves broken internal XML references that corrupt the file in Excel.
   const usedSheets=new Set(locsData.map(ld=>SHEET[ld.location.gstin||'']).filter(Boolean));
-  wb.SheetNames=wb.SheetNames.filter(sn=>usedSheets.has(sn));
-  Object.keys(wb.Sheets).forEach(sn=>{if(!usedSheets.has(sn)) delete wb.Sheets[sn];});
+  const outWb=XLSX.utils.book_new();
+  wb.SheetNames.filter(sn=>usedSheets.has(sn)).forEach(sn=>{
+    XLSX.utils.book_append_sheet(outWb,wb.Sheets[sn],sn);
+  });
 
-  return XLSX.write(wb,{bookType:'xlsx',type:'base64',cellStyles:true});
+  return XLSX.write(outWb,{bookType:'xlsx',type:'base64',cellStyles:true});
 }
 
 
