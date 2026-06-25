@@ -1663,6 +1663,11 @@ function makePackingList(locsData,poData,maxPcs,ppWt,boxWt){
     for(let r=10;r<=newTotIdx;r++) ws['!rows'][r]={hpt:ch}; // carton+totals rows
   });
 
+  // Remove sheets that were not filled (i.e. no matching location was passed in)
+  const usedSheets=new Set(locsData.map(ld=>SHEET[ld.location.gstin||'']).filter(Boolean));
+  wb.SheetNames=wb.SheetNames.filter(sn=>usedSheets.has(sn));
+  Object.keys(wb.Sheets).forEach(sn=>{if(!usedSheets.has(sn)) delete wb.Sheets[sn];});
+
   return XLSX.write(wb,{bookType:'xlsx',type:'base64',cellStyles:true});
 }
 
@@ -1957,7 +1962,7 @@ async function downloadStickerLoc(idx){
     const maxPcs=parseInt(document.getElementById('maxPcs').value)||60;
     const ppWt=parseFloat(document.getElementById('ppWt').value)||0.1;
     const boxWt=parseFloat(document.getElementById('boxWt').value)||1.5;
-    const {loc,items,invNum}=getLocData(idx);
+    const {loc,items,invNum,invDate}=getLocData(idx);
     const gstin=loc.gstin||'';
     const b64=await makeStickers([{location:loc,items,invNum,invDate}],poData,[gstin],maxPcs,ppWt,boxWt);
     const locShort=(loc.name||'').split(' ').slice(-2).join('_')||'loc'+idx;
