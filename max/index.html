@@ -197,7 +197,7 @@ async function parsePOPDF(file){
     rate:255, mrp:599, hsn:'6206300',
     styleNo:'', itemDesc:'KINARA', colour:'OFF WHITE',
     prepackRatio:{S:2,M:2,L:2,XL:1,XXL:1},
-    prepackArticle:'', singleArticlePrefix:'',
+    prepackArticle:'', singleArticlePrefix:'', singleArticleCodes:{},
     locations:[]
   };
 
@@ -301,6 +301,12 @@ async function parsePOPDF(file){
       if(!locsSeen[itemGSTIN]) locsSeen[itemGSTIN]={name:'Unknown',gstin:itemGSTIN,items:{}};
       if(!locsSeen[itemGSTIN].items[size])
         locsSeen[itemGSTIN].items[size]=qty;
+    }
+    // Store exact 13-digit item code per size from the PO line
+    const codeM=itemCodeBuf.match(/(10000\d{8})/);
+    if(codeM){
+      if(size==='PREPACK') result.prepackArticle=result.prepackArticle||codeM[0];
+      else result.singleArticleCodes[size]=codeM[0];
     }
     inItem=false; itemCodeBuf=''; descBuf=''; afterCostBuf=[]; isPrepackItem=false;
   };
@@ -1429,7 +1435,8 @@ async function makeInvoice(location,items,poData,invNum,dateSupply,lrNo,mvNo,mod
   const mrp=parseFloat(poData.mrp)||599;
   const ppc=Object.values(poData.prepackRatio||{S:2,M:2,L:2,XL:1,XXL:1}).reduce((a,b)=>a+b,0)||8;
   const pfx=poData.singleArticlePrefix||'';
-  const artMap={PREPACK:poData.prepackArticle||'',S:pfx+'625',M:pfx+'623',L:pfx+'621',XL:pfx+'627',XXL:pfx+'629'};
+  const codes=poData.singleArticleCodes||{};
+  const artMap={PREPACK:poData.prepackArticle||'',S:codes.S||pfx+'625',M:codes.M||pfx+'623',L:codes.L||pfx+'621',XL:codes.XL||pfx+'627',XXL:codes.XXL||pfx+'629'};
   let tPacks=0,tQty=0,tTax=0;
 
   ['PREPACK','S','M','L','XL','XXL'].forEach((sz,si)=>{
@@ -1770,7 +1777,8 @@ async function makeStickers(locsData,poData,selectedGstins,maxPcs,ppWt,boxWt){
       // Item data
       const isPrepack=ctn.type==='PREPACK';
       const pfx=poData.singleArticlePrefix||'';
-      const artMap={S:pfx+'625',M:pfx+'623',L:pfx+'621',XL:pfx+'627',XXL:pfx+'629'};
+      const codes=poData.singleArticleCodes||{};
+      const artMap={S:codes.S||pfx+'625',M:codes.M||pfx+'623',L:codes.L||pfx+'621',XL:codes.XL||pfx+'627',XXL:codes.XXL||pfx+'629'};
       const ratio=poData.prepackRatio||{S:2,M:2,L:2,XL:1,XXL:1};
       const colour=poData.colour||'OFF WHITE';
 
@@ -1849,7 +1857,8 @@ function getPoData(){
     colour:document.getElementById('colour').value,
     prepackRatio:parseRatio(),
     prepackArticle:parsedData.prepackArticle||'',
-    singleArticlePrefix:parsedData.singleArticlePrefix||''
+    singleArticlePrefix:parsedData.singleArticlePrefix||'',
+    singleArticleCodes:parsedData.singleArticleCodes||{}
   };
 }
 function getLocData(i){
