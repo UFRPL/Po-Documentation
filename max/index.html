@@ -279,7 +279,8 @@ async function parsePOPDF(file){
   // Item-tracking state lives OUTSIDE the page loop so items that span page boundaries
   // are handled correctly (size label may be on the next page after the quantity data)
   let inItem=false, itemCodeBuf='', descBuf='', afterCostBuf=[], itemY=0, itemGSTIN=null;
-  let isPrepackItem=false; // set from Pack Ind "Y" in first band; avoids descBuf regex for prepack
+  let isPrepackItem=false;
+  let currentItemCode='', itemCodeColX=-1, itemCodeParts=[];
 
   const finaliseItem=(forcedSize=null)=>{
     if(!inItem||!itemGSTIN) return;
@@ -302,13 +303,12 @@ async function parsePOPDF(file){
       if(!locsSeen[itemGSTIN].items[size])
         locsSeen[itemGSTIN].items[size]=qty;
     }
-    // Store exact 13-digit item code per size from the PO line
-    const codeM=itemCodeBuf.match(/(10000\d{8})/);
-    if(codeM){
-      if(size==='PREPACK') result.prepackArticle=result.prepackArticle||codeM[0];
-      else result.singleArticleCodes[size]=codeM[0];
+    if(currentItemCode){
+      if(size==='PREPACK') result.prepackArticle=result.prepackArticle||currentItemCode;
+      else result.singleArticleCodes[size]=currentItemCode;
     }
     inItem=false; itemCodeBuf=''; descBuf=''; afterCostBuf=[]; isPrepackItem=false;
+    currentItemCode=''; itemCodeColX=-1; itemCodeParts=[];
   };
 
   for(const pgItems of allPages){
@@ -379,6 +379,19 @@ async function parsePOPDF(file){
         itemCodeBuf=bandText.replace(/\s/g,'');
         descBuf=bandText;
         afterCostBuf=[];
+        // ── Extract item code by x-column of the '10000' token ──
+        // Item codes like "10000 15696 401" may be split across PDF text items;
+        // collecting only tokens in the same x-column reassembles them correctly.
+        currentItemCode=''; itemCodeParts=[];
+        const startTok=band.find(it=>/\b10000\b/.test(it.t));
+        itemCodeColX=startTok?startTok.x:-1;
+        if(itemCodeColX>=0){
+          band.filter(it=>Math.abs(it.x-itemCodeColX)<=30)
+              .sort((a,b)=>b.y-a.y)
+              .forEach(it=>itemCodeParts.push(it.t.replace(/\s/g,'')));
+          const cm=(itemCodeParts.join('')).match(/(10000\d{8})/);
+          if(cm) currentItemCode=cm[1];
+        }
         // Detect prepack: Pack Ind "Y" appears as standalone " Y " before the unit cost
         const beforeRate=rateStr&&bandText.includes(rateStr)?bandText.slice(0,bandText.indexOf(rateStr)):bandText;
         isPrepackItem=/\s+Y\s+/.test(beforeRate)||/^Y\s/.test(beforeRate.trim());
@@ -395,6 +408,15 @@ async function parsePOPDF(file){
       } else if(inItem){
         descBuf+=' '+bandText;
         itemCodeBuf+=bandText.replace(/\s/g,'');
+        // If code not yet fully assembled, pick up digit tokens from the same x-column
+        if(!currentItemCode && itemCodeColX>=0){
+          const colTks=band.filter(it=>Math.abs(it.x-itemCodeColX)<=30&&/^\d+$/.test(it.t));
+          if(colTks.length){
+            colTks.sort((a,b)=>b.y-a.y).forEach(it=>itemCodeParts.push(it.t));
+            const cm=(itemCodeParts.join('')).match(/(10000\d{8})/);
+            if(cm) currentItemCode=cm[1];
+          }
+        }
         // Continuation bands: only append tokens if we haven't found totVal yet
         // (totVal = first 5+ digit number; once found we have all we need)
         // This prevents "16637" from the item code continuation being misread as totVal
