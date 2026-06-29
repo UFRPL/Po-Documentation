@@ -1868,25 +1868,40 @@ async function makeStickers(locsData,poData,selectedGstins,maxPcs,ppWt,boxWt){
         set(17,13,ppc);                          // PCS IN MASTER BAG = pcs per prepack
         set(17,14,ctn.total);                   // TOTAL PCS = packs × ppc
       } else if(ctn.type==='MIX'){
-        // MIX carton: one row per size with pieces
         const mixSizes=['S','M','L','XL','XXL'].filter(sz=>ctn[sz]>0);
-        // Remove template merges in item rows (17-21) — template is designed for 1 item row;
-        // merges from rows 17-18 would collapse/truncate content written to rows 18+
-        ws['!merges']=ws['!merges'].filter(m=>!(m.s.r>=off+17&&m.s.r<=off+21));
-        // Grab reference style from row 17 (first item row) and apply to all MIX rows
+
+        // Remove ALL merges that touch rows 17-21 (start OR end inside range).
+        // Template has a 2-row SINGLE slot at rows 17-18 and footer merges at 19-21 —
+        // both would collapse or truncate MIX item content.
+        ws['!merges']=ws['!merges'].filter(m=>{
+          const hi=off+21, lo=off+17;
+          return !(m.s.r>=lo&&m.s.r<=hi) && !(m.e.r>=lo&&m.e.r<=hi);
+        });
+
+        // Template rows 18-21 have tiny/zero heights (not designed as item rows).
+        // Capture row 17's height to stamp onto every MIX item row.
+        const itemHpt=(ws['!rows']&&ws['!rows'][off+17]&&ws['!rows'][off+17].hpt)||20;
+
+        // Row 17 per-column style is the reference for all MIX rows
         const refRowStyle={};
         for(let c=0;c<15;c++){
           const a=XLSX.utils.encode_cell({r:off+17,c});
           if(ws[a]&&ws[a].s) refRowStyle[c]=JSON.parse(JSON.stringify(ws[a].s));
         }
+
         mixSizes.forEach((sz,si)=>{
           const r=17+si;
-          // Apply uniform bold style from row 17 to each MIX row
+          // Fix row height — template rows 18-21 are tiny
+          if(!ws['!rows']) ws['!rows']=[];
+          ws['!rows'][off+r]={hpt:itemHpt};
+          // Stamp row-17 style on every cell of this row
           for(let c=0;c<15;c++){
             const a=XLSX.utils.encode_cell({r:off+r,c});
             if(!ws[a]) ws[a]={v:'',t:'str'};
-            ws[a].s=refRowStyle[c]?JSON.parse(JSON.stringify(refRowStyle[c])):(ws[a].s||{});
-            if(ws[a].s&&ws[a].s.font) ws[a].s.font.bold=true;
+            ws[a].s=refRowStyle[c]
+              ? JSON.parse(JSON.stringify(refRowStyle[c]))
+              : {font:{name:'Arial',sz:12,bold:true},alignment:{horizontal:'center',vertical:'center'},border:{}};
+            ws[a].s.font.bold=true;
           }
           set(r,0,artMap[sz]||'');
           set(r,2,poData.styleNo||'');
