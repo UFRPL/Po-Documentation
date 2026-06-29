@@ -89,16 +89,24 @@ table.sz input{width:80px;padding:4px 5px;border:1px solid var(--border);border-
     <div><label>Style No.</label><input id="styleNo"></div>
     <div><label>Item Description</label><input id="itemDesc"></div>
     <div><label>Colour</label><input id="colour"></div>
-    <div><label>Prepack Ratio S:M:L:XL:XXL</label><input id="ratio" placeholder="2:2:2:1:1"></div>
+    <div><label>Prepack Ratio S:M:L:XL:XXL</label><input id="ratio" placeholder="2:2:2:1:1" oninput="updatePackingFromRatio()"></div>
   </div>
 </div>
 
 <div id="setCard" class="card" style="display:none">
   <div class="card-title">Step 3 — Packing Settings</div>
   <div class="grid">
-    <div><label>Max PCS per Carton</label><input id="maxPcs" type="number" value="60" min="1"></div>
+    <div><label>PCS per Master Bag</label><input id="pcsPerBag" type="number" value="8" min="1" oninput="onPcsPerBagChange()"></div>
+    <div><label>Master Bags per Carton</label><input id="mstBags" type="number" value="7" min="1"></div>
+    <div><label>Max PCS per Carton (Singles)</label><input id="maxPcs" type="number" value="60" min="1" oninput="onMaxPcsChange()"></div>
+  </div>
+  <div class="grid" style="margin-top:8px">
     <div><label>Per-Piece Weight (kg)</label><input id="ppWt" type="number" value="0.1" step="0.01"></div>
     <div><label>Box Tare Weight (kg)</label><input id="boxWt" type="number" value="1.5" step="0.01"></div>
+    <div style="display:flex;align-items:center;gap:8px;margin-top:20px">
+      <input type="checkbox" id="allowMix" style="width:auto;padding:0;margin:0">
+      <label for="allowMix" style="margin:0;text-transform:none;font-weight:500;font-size:13px;cursor:pointer;color:var(--text)">Allow Mixed Size Carton for Leftovers</label>
+    </div>
   </div>
 </div>
 
@@ -549,6 +557,7 @@ function populateForm(d){
   document.getElementById('colour').value=d.colour;
   const r=d.prepackRatio||{S:2,M:2,L:2,XL:1,XXL:1};
   document.getElementById('ratio').value=['S','M','L','XL','XXL'].map(s=>r[s]||0).join(':');
+  updatePackingFromRatio();
   buildTabs(d.locations);
   ['poCard','setCard','locCard','genCard'].forEach(id=>document.getElementById(id).style.display='');
   // Populate sticker location checkboxes
@@ -646,20 +655,61 @@ function parseRatio(){
   const p=raw.split(':').map(Number);
   return {S:p[0]||0,M:p[1]||0,L:p[2]||0,XL:p[3]||0,XXL:p[4]||0};
 }
+function updatePackingFromRatio(){
+  const ppc=Object.values(parseRatio()).reduce((a,b)=>a+b,0)||8;
+  const pb=document.getElementById('pcsPerBag');
+  if(pb) pb.value=ppc;
+  onPcsPerBagChange();
+}
+function onPcsPerBagChange(){
+  const ppc=parseInt(document.getElementById('pcsPerBag')?.value)||8;
+  const maxPcs=parseInt(document.getElementById('maxPcs')?.value)||60;
+  const mb=document.getElementById('mstBags');
+  if(mb) mb.value=Math.max(1,Math.floor(maxPcs/ppc));
+}
+function onMaxPcsChange(){
+  onPcsPerBagChange();
+}
 
 // ─── CARTON DISTRIBUTION ────────────────────────────────
-function distributeCartons(items, ratio, maxPcs){
+function distributeCartons(items, ratio, maxPcs, mstBagsPerCtn, allowMix){
   const ppc=Object.values(ratio).reduce((a,b)=>a+b,0)||8;
-  const maxPP=Math.max(1,Math.floor(maxPcs/ppc));
+  const maxPP=mstBagsPerCtn||Math.max(1,Math.floor(maxPcs/ppc));
   const cartons=[];
+  const remainders={S:0,M:0,L:0,XL:0,XXL:0};
+
+  // Single-size: full cartons first, collect leftovers
   ['S','M','L','XL','XXL'].forEach(sz=>{
     let rem=parseInt(items[sz]||0);
-    while(rem>0){
-      const take=Math.min(rem,maxPcs);
-      cartons.push({type:'SINGLE',pcs:take,S:0,M:0,L:0,XL:0,XXL:0,total:take,[sz]:take});
-      rem-=take;
+    while(rem>=maxPcs){
+      cartons.push({type:'SINGLE',pcs:maxPcs,S:0,M:0,L:0,XL:0,XXL:0,total:maxPcs,[sz]:maxPcs});
+      rem-=maxPcs;
+    }
+    if(rem>0){
+      if(allowMix) remainders[sz]+=rem;
+      else cartons.push({type:'SINGLE',pcs:rem,S:0,M:0,L:0,XL:0,XXL:0,total:rem,[sz]:rem});
     }
   });
+
+  // MIX cartons from all leftover pieces (up to maxPcs each)
+  if(allowMix){
+    let totRem=Object.values(remainders).reduce((a,b)=>a+b,0);
+    while(totRem>0){
+      const ctn={type:'MIX',S:0,M:0,L:0,XL:0,XXL:0,pcs:0,total:0};
+      let space=maxPcs;
+      ['S','M','L','XL','XXL'].forEach(sz=>{
+        if(remainders[sz]>0&&space>0){
+          const take=Math.min(remainders[sz],space);
+          ctn[sz]=take; ctn.pcs+=take; ctn.total+=take;
+          remainders[sz]-=take; space-=take;
+        }
+      });
+      if(ctn.total>0) cartons.push(ctn);
+      totRem=Object.values(remainders).reduce((a,b)=>a+b,0);
+    }
+  }
+
+  // PREPACK cartons
   const preTotal=parseInt(items['PREPACK']||0);
   let ppUnits=Math.floor(preTotal/ppc);
   while(ppUnits>0){
@@ -1542,7 +1592,7 @@ function makePackingList(locsData,poData,maxPcs,ppWt,boxWt){
     const sn=SHEET[gstin]; if(!sn||!wb.Sheets[sn]) return;
     const ws=wb.Sheets[sn];
     const off=OFF[gstin]||0;
-    const cartons=distributeCartons(ld.items,ratio,maxPcs);
+    const cartons=distributeCartons(ld.items,ratio,maxPcs,poData.mstBagsPerCtn,poData.allowMix);
     const packed=cartons.reduce((a,c)=>a+c.total,0);
     const order=Object.values(ld.items).reduce((a,b)=>a+parseInt(b||0),0);
     const colour=poData.colour||'OFF WHITE';
@@ -1731,7 +1781,7 @@ async function makeStickers(locsData,poData,selectedGstins,maxPcs,ppWt,boxWt){
   for(const ld of locsData){
     const gstin=ld.location.gstin||'';
     if(!selectedGstins.includes(gstin)) continue;
-    const cartons=distributeCartons(ld.items,poData.prepackRatio||{S:2,M:2,L:2,XL:1,XXL:1},maxPcs);
+    const cartons=distributeCartons(ld.items,poData.prepackRatio||{S:2,M:2,L:2,XL:1,XXL:1},maxPcs,poData.mstBagsPerCtn,poData.allowMix);
     const total=cartons.length;
     const ws={};ws['!merges']=[];ws['!rows']=[];
     ws['!cols']=JSON.parse(JSON.stringify(tmplWs['!cols']||[]));
@@ -1817,6 +1867,19 @@ async function makeStickers(locsData,poData,selectedGstins,maxPcs,ppWt,boxWt){
         set(17,11,ctn.pcs);                     // MASTER BAG = number of prepacks in carton
         set(17,13,ppc);                          // PCS IN MASTER BAG = pcs per prepack
         set(17,14,ctn.total);                   // TOTAL PCS = packs × ppc
+      } else if(ctn.type==='MIX'){
+        // MIX carton: one row per size that has pieces
+        const mixSizes=['S','M','L','XL','XXL'].filter(sz=>ctn[sz]>0);
+        mixSizes.forEach((sz,si)=>{
+          set(17+si,0,artMap[sz]||'');
+          set(17+si,2,poData.styleNo||'');
+          set(17+si,5,sz);
+          set(17+si,8,ctn[sz]);
+          set(17+si,10,colour);
+          set(17+si,11,0);
+          set(17+si,13,0);
+          set(17+si,14,ctn[sz]);
+        });
       } else {
         // SINGLE carton: one row (2-row merged block at rows 17-18)
         const sz=getCartonSize(ctn);
@@ -1880,7 +1943,9 @@ function getPoData(){
     prepackRatio:parseRatio(),
     prepackArticle:parsedData.prepackArticle||'',
     singleArticlePrefix:parsedData.singleArticlePrefix||'',
-    singleArticleCodes:parsedData.singleArticleCodes||{}
+    singleArticleCodes:parsedData.singleArticleCodes||{},
+    mstBagsPerCtn:parseInt(document.getElementById('mstBags')?.value)||7,
+    allowMix:document.getElementById('allowMix')?.checked||false
   };
 }
 function getLocData(i){
@@ -1935,7 +2000,7 @@ async function downloadInvoice(idx){
     const poData=getPoData();
     const maxPcs=parseInt(document.getElementById('maxPcs').value)||60;
     const {loc,items,invNum,ds,lr,mv,mt}=getLocData(idx);
-    const cartons=distributeCartons(items,poData.prepackRatio,maxPcs);
+    const cartons=distributeCartons(items,poData.prepackRatio,maxPcs,poData.mstBagsPerCtn,poData.allowMix);
     const b64=await makeInvoice(loc,items,poData,invNum,ds,lr,mv,mt,'',cartons.length);
     const fname='Invoice_'+(invNum.replace(/\//g,'_')||loc.gstin||'loc'+idx)+'.xlsx';
     triggerDownload(b64,fname);
@@ -2036,7 +2101,7 @@ async function generate(){
     const packLD=[];
     for(let i=0;i<parsedData.locations.length;i++){
       const {loc,items,invNum,ds,lr,mv,mt}=getLocData(i);
-      const cartons=distributeCartons(items,poData.prepackRatio,maxPcs);
+      const cartons=distributeCartons(items,poData.prepackRatio,maxPcs,poData.mstBagsPerCtn,poData.allowMix);
       const b64=await makeInvoice(loc,items,poData,invNum,ds,lr,mv,mt,'',cartons.length);
       zip.file('Invoice_'+(invNum.replace(/\//g,'_')||loc.gstin)+'.xlsx',b64,{base64:true});
       packLD.push({location:loc,items,invNum});
