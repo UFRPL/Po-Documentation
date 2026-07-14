@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Ritu Kumar-AVAASA Label document</title>
+<title>Azorte Label document</title>
 <style>
   :root {
     --bg: #faf9f7;
@@ -63,9 +63,24 @@
 </style>
 </head>
 <body>
+<script>(function(){var s;try{s=JSON.parse(localStorage.getItem('ufr_session'));}catch(e){}if(!s||!s.user||Date.now()>s.expiry){window.location.replace('../index.html');}else{window._loggedUser=s.user;}})();</script>
+<!-- UNITED NAV BAR -->
+<style>#uNav{position:fixed!important;top:0;left:0;right:0;width:100%}body{padding-top:80px!important}</style>
+<nav id="uNav" style="display:flex;align-items:center;justify-content:space-between;background:#1B3080;padding:0 24px;height:48px;position:fixed;top:0;left:0;right:0;z-index:99999;box-shadow:0 2px 10px rgba(0,0,0,.4);border-bottom:3px solid #D42027;font-family:'Segoe UI',Arial,sans-serif">
+  <a href="../index.html" style="display:inline-flex;align-items:center;gap:6px;color:rgba(255,255,255,.85);font-size:12.5px;font-weight:600;text-decoration:none;padding:5px 12px;border-radius:6px;border:1px solid rgba(255,255,255,.18)">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+    Home
+  </a>
+  <span style="color:#fff;font-size:13px;font-weight:600;letter-spacing:.3px;position:absolute;left:50%;transform:translateX(-50%);pointer-events:none">United Fashion &amp; Retail Pvt. Ltd.</span>
+  <div style="display:flex;align-items:center;gap:10px">
+    <span style="color:#F5A800;font-size:11px;font-weight:700;background:rgba(245,168,0,.12);border:1px solid rgba(245,168,0,.3);padding:4px 12px;border-radius:20px;letter-spacing:.5px;text-transform:uppercase">Azorte</span>
+    <span id="navUser" style="color:rgba(255,255,255,.7);font-size:11.5px;font-weight:500"></span>
+    <button onclick="(function(){localStorage.removeItem('ufr_session');window.location.replace('../index.html');})()" style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:rgba(255,255,255,.85);padding:4px 10px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;font-family:'Segoe UI',Arial,sans-serif">Sign Out</button>
+  </div>
+</nav>
   <div class="card">
-    <h1>Ritu Kumar-AVAASA Label document</h1>
-    <p class="sub">Drop your PO export CSV below. Everything runs inside this page &mdash; nothing is uploaded anywhere, no internet connection required &mdash; and a formatted .xlsx downloads automatically.</p>
+    <h1>Azorte Label document</h1>
+    <p class="sub">Drop your AZORTE PO export CSV below. Everything runs inside this page &mdash; nothing is uploaded anywhere, no internet connection required &mdash; and a formatted .xlsx downloads automatically.</p>
 
     <div id="dropzone">
       <div class="icon">📄</div>
@@ -77,11 +92,12 @@
     <div id="status"></div>
 
     <footer>
-      Rows sharing the same Style Code + Color + Size are collapsed into a single line;
-      tag Qty is the sum across them, and garment po number keeps one randomly picked PO from that group.
-      Mapping: Format←Business Unit, supplier id←Vendor Code,
-      Color/Desc/Article Number parsed from Material Description, Yrmonth from Delivery Date.
-      Metsize, Label Type, Fashion grade (code), and usp are left blank (not present in the source export).
+      Rows sharing the same Style Code + Color + Size are collapsed into a single line, sorted by
+      Style Code, then Color, then Size (XS/S/M/L/XL/XXL); tag Qty is the sum across them, and
+      garment po number keeps one randomly picked PO from that group.
+      Vendor Name is always "UNITED TEXTILE MILLS PRIVATE LIMITED". Desc is the Brick value directly.
+      Label Type is always "1 Number". Fashion grade and Bar code colour are always "N/A".
+      Metsize is left blank (not present in the source export).
     </footer>
   </div>
 
@@ -141,7 +157,8 @@ function downloadFile(bytes, sourceName, rowCount, groupCount) {
   const a = document.createElement('a');
   const outName = sourceName.replace(/\.csv$/i, '') + '_Formatted.xlsx';
   a.href = url;
-  a.download = outName || 'PO_Export_Dump.xlsx';
+  a.download = outName || 'Azorte_Export_Dump.xlsx';
+  logDownload('Label Document', a.download);
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -189,44 +206,52 @@ function parseCSV(text) {
   return out;
 }
 
-/* ===================== Domain mapping (CSV columns -> template columns) ===================== */
+/* ===================== Domain mapping (CSV columns -> AZORTE price-tag template) ===================== */
 const HEADERS = [
   "Format", "garment po number ", "supplier id ", "Vendor Name", "Style Code",
   "Color", "Size", "Metsize", "Label Type", "Desc", "Yrmonth", "MRP", "EAN",
   "Article Number", "tag Qty", "Segment", "Family", "Class", "Fashion grade",
-  "Fashion grade Desc", "usp"
+  "Fashion grade Desc", "Bar code colour", "Brand Description"
 ];
-const COLUMN_WIDTHS = [6.83, 17.16, 8.43, 36.66, 22.33, 17.16, 8.43, 10.0, 32.5, 33.66, 7.83, 17.16, 14.0, 17.16, 6.33, 17.16, 8.43, 14.83, 17.16, 8.43, 9.0];
+const COLUMN_WIDTHS = [
+  7.21875, 17.664, 10.332, 41.109, 20.219, 12.441, 5.219, 8.0, 10.441, 7.664,
+  8.332, 5.555, 16.664, 8.43, 7.555, 15.887, 14.219, 15.332, 13.0, 17.664,
+  14.219, 15.887
+];
 
-// Data cellXfs style index per 1-based column (matches the original template exactly):
-//   3 = plain (border only), 4 = integer "0", 5 = float "#,##0.00",
-//   6 = centered text, 7 = left/center (Metsize only), 8 = centered integer (tag Qty),
-//   9 = centered date "mm/yyyy" (Yrmonth)
-const COL_STYLE = {
-  1: 3, 2: 4, 3: 3, 4: 3, 5: 3, 6: 3,
-  7: 6, 8: 7, 9: 6, 10: 3, 11: 9, 12: 5, 13: 4, 14: 4,
-  15: 8, 16: 6, 17: 6, 18: 6, 19: 6, 20: 6, 21: 3
-};
-// Header style per 1-based column: all centered except the last column (U), which matches
-// the original template's un-centered header cell.
-const HEADER_STYLE = { 21: 2 };
+// This reference file has no borders and no centered alignment (plain default styling).
+// Style index per 1-based column: 0 = default/General, 1 = integer "0" (EAN, Article Number,
+// left-aligned to match the reference), 2 = date "mm/yyyy" (Yrmonth).
+const COL_STYLE = { 11: 2, 13: 1, 14: 1 };
 
 // Vendor Name is always forced to this value, regardless of what the source CSV contains.
 const VENDOR_NAME_OVERRIDE = "UNITED TEXTILE MILLS PRIVATE LIMITED";
+// No source data for these — always literal per the reference file.
+const NA_VALUE = "N/A";
+const LABEL_TYPE_VALUE = "1 Number";
 
-function parseMaterial(desc) {
+// Material Description looks like "SVRNAA BY AZORTE_KURTAS_444004330002_RUST, RUST, M".
+// We only need the color out of it — Desc comes from the Brick column directly (confirmed
+// against the reference file, which shows Desc = "KURTAS" = the Brick value, not brand+brick text).
+function parseColor(desc) {
   desc = desc || '';
-  const parts = desc.split('_');
-  if (parts.length >= 4) {
-    return [parts[0].trim(), parts[3].split(',')[0].trim(), parts[2].trim()];
+  const underscoreParts = desc.split('_');
+  if (underscoreParts.length >= 4) {
+    return underscoreParts[3].split(',')[0].trim();
   }
-  return [desc.trim(), '', ''];
+  const commaParts = desc.split(',').map((s) => s.trim());
+  if (commaParts.length >= 3) return commaParts[commaParts.length - 2];
+  return '';
 }
+
+// Handles both "YYYY-MM-DD ..." and "DD-MM-YYYY ..." delivery date formats.
 function parseDeliveryDate(s) {
   s = (s || '').trim();
-  const m = s.match(/^(\d{2})-(\d{2})-(\d{4})/);
-  if (!m) return null;
-  return { month: +m[2], year: +m[3] };
+  let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return { year: +m[1], month: +m[2] };
+  m = s.match(/^(\d{2})-(\d{2})-(\d{4})/);
+  if (m) return { month: +m[2], year: +m[3] };
+  return null;
 }
 function excelSerialDate(year, month, day) {
   const utcTarget = Date.UTC(year, month - 1, day);
@@ -259,26 +284,23 @@ function sizeRank(size) {
 
 /* Collapse rows that share the same Style Code + Color + Size into a single line:
    tag Qty becomes the sum across all of them, and one PO number is kept at random
-   from the group that rolled in. */
+   from the group that rolled in. Sorted by Style Code, then Color, then Size. */
 function aggregateRows(rows) {
   const groups = new Map();
   const order = [];
   rows.forEach((row) => {
-    const [desc, color, artnum] = parseMaterial(row['Material Description']);
+    const color = parseColor(row['Material Description']);
     const size = row['Size'] || '';
     const styleCode = row['Style Code'] || '';
     const key = styleCode + '|' + color + '|' + size;
 
     if (!groups.has(key)) {
-      groups.set(key, {
-        first: row, desc, color, artnum, size, styleCode,
-        poNumbers: [], poSeen: new Set(), qtySum: 0
-      });
+      groups.set(key, { first: row, color, size, styleCode, poNumbers: [], qtySum: 0 });
       order.push(key);
     }
     const g = groups.get(key);
     const po = (row['PO Number'] || '').trim();
-    if (po && !g.poSeen.has(po)) { g.poSeen.add(po); g.poNumbers.push(po); }
+    if (po) g.poNumbers.push(po);
     const qty = parseFloat(row['Article Qty']);
     if (!isNaN(qty)) g.qtySum += qty;
   });
@@ -299,8 +321,7 @@ function buildSheetXml(rows) {
   let sheetData = '<sheetData><row r="1">';
   HEADERS.forEach((h, i) => {
     const ref = colLetter(i + 1) + '1';
-    const hStyle = HEADER_STYLE[i + 1] || 1;
-    sheetData += `<c r="${ref}" s="${hStyle}" t="inlineStr"><is><t xml:space="preserve">${esc(h)}</t></is></c>`;
+    sheetData += `<c r="${ref}" t="inlineStr"><is><t xml:space="preserve">${esc(h)}</t></is></c>`;
   });
   sheetData += '</row>';
 
@@ -323,32 +344,35 @@ function buildSheetXml(rows) {
       g.styleCode,
       g.color,
       g.size,
-      '', '',
-      g.desc,
+      '',
+      LABEL_TYPE_VALUE,
+      row['Brick'] || '',
       yrmonth,
       toNum(row['MRP']),
       toNum(row['EAN']),
-      toNum(g.artnum),
+      toNum(row['Variant Article Number']),
       g.qtySum,
       row['Segment'] || '',
       row['Family'] || '',
       row['Brick'] || '',
-      '',
+      NA_VALUE,
       row['Fashion Grade'] || '',
-      ''
+      NA_VALUE,
+      row['Business Unit'] || ''
     ];
 
     sheetData += `<row r="${rIdx}">`;
     rowValues.forEach((val, i) => {
       const colI = i + 1;
       const ref = colLetter(colI) + rIdx;
-      const style = COL_STYLE[colI] || 2;
+      const style = COL_STYLE[colI];
+      const styleAttr = style ? ` s="${style}"` : '';
       if (val === '' || val === null || val === undefined) {
-        sheetData += `<c r="${ref}" s="${style}"/>`;
+        sheetData += `<c r="${ref}"${styleAttr}/>`;
       } else if (typeof val === 'number') {
-        sheetData += `<c r="${ref}" s="${style}"><v>${val}</v></c>`;
+        sheetData += `<c r="${ref}"${styleAttr}><v>${val}</v></c>`;
       } else {
-        sheetData += `<c r="${ref}" s="${style}" t="inlineStr"><is><t xml:space="preserve">${esc(val)}</t></is></c>`;
+        sheetData += `<c r="${ref}"${styleAttr} t="inlineStr"><is><t xml:space="preserve">${esc(val)}</t></is></c>`;
       }
     });
     sheetData += '</row>';
@@ -370,24 +394,14 @@ ${sheetData}
 const STYLES_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
 <numFmts count="1"><numFmt numFmtId="164" formatCode="mm/yyyy"/></numFmts>
-<fonts count="1"><font><sz val="11"/><name val="Calibri"/></font></fonts>
+<fonts count="1"><font><sz val="10"/><name val="Arial"/></font></fonts>
 <fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills>
-<borders count="2">
-<border><left/><right/><top/><bottom/><diagonal/></border>
-<border><left style="thin"><color indexed="64"/></left><right style="thin"><color indexed="64"/></right><top style="thin"><color indexed="64"/></top><bottom style="thin"><color indexed="64"/></bottom><diagonal/></border>
-</borders>
+<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>
 <cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
-<cellXfs count="10">
+<cellXfs count="3">
 <xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
-<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
-<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1"/>
-<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1"/>
-<xf numFmtId="1" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyNumberFormat="1"/>
-<xf numFmtId="4" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyNumberFormat="1"/>
-<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
-<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf>
-<xf numFmtId="1" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyNumberFormat="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
-<xf numFmtId="164" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyNumberFormat="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
+<xf numFmtId="1" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyAlignment="1"><alignment horizontal="left"/></xf>
+<xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>
 </cellXfs>
 <cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>
 </styleSheet>`;
@@ -498,6 +512,8 @@ function buildXlsx(rows) {
   ];
   return buildZip(files);
 }
+function logDownload(type,details){try{var logs=JSON.parse(localStorage.getItem('ufr_download_log')||'[]');logs.push({ts:new Date().toISOString(),user:window._loggedUser||'unknown',portal:'Azorte',type:type,details:details||''});localStorage.setItem('ufr_download_log',JSON.stringify(logs));}catch(e){}}
+(function(){var nu=document.getElementById('navUser');if(nu&&window._loggedUser)nu.textContent='👤 '+window._loggedUser;})();
 </script>
 </body>
 </html>
