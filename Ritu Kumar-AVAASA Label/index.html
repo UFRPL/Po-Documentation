@@ -65,7 +65,8 @@
 <body>
 <script>(function(){var s;try{s=JSON.parse(localStorage.getItem('ufr_session'));}catch(e){}if(!s||!s.user||Date.now()>s.expiry){window.location.replace('../index.html');}else{window._loggedUser=s.user;}})();</script>
 <!-- UNITED NAV BAR -->
-<nav id="uNav" style="display:flex;align-items:center;justify-content:space-between;background:#1B3080;padding:0 24px;height:48px;position:sticky;top:0;z-index:99999;box-shadow:0 2px 10px rgba(0,0,0,.4);border-bottom:3px solid #D42027;font-family:'Segoe UI',Arial,sans-serif">
+<style>#uNav{position:fixed!important;top:0;left:0;right:0;width:100%}body{padding-top:80px!important}</style>
+<nav id="uNav" style="display:flex;align-items:center;justify-content:space-between;background:#1B3080;padding:0 24px;height:48px;position:fixed;top:0;left:0;right:0;z-index:99999;box-shadow:0 2px 10px rgba(0,0,0,.4);border-bottom:3px solid #D42027;font-family:'Segoe UI',Arial,sans-serif">
   <a href="../index.html" style="display:inline-flex;align-items:center;gap:6px;color:rgba(255,255,255,.85);font-size:12.5px;font-weight:600;text-decoration:none;padding:5px 12px;border-radius:6px;border:1px solid rgba(255,255,255,.18)">
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
     Home
