@@ -107,14 +107,67 @@ footer strong{color:var(--gold);font-weight:600}
   .brands-grid{grid-template-columns:1fr}
   .site-header .company{font-size:11px}
 }
+/* ── LOGIN OVERLAY ──────────────────────────────── */
+#loginOverlay{position:fixed;inset:0;background:linear-gradient(160deg,var(--navy-dark) 0%,var(--navy) 100%);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px}
+.login-box{background:var(--white);border-radius:18px;padding:40px 36px;width:100%;max-width:380px;box-shadow:0 20px 60px rgba(0,0,0,.5);text-align:center}
+.login-field{margin-bottom:14px;text-align:left}
+.login-field label{display:block;font-size:11px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.login-field input{width:100%;padding:11px 14px;border:2px solid var(--border);border-radius:8px;font-size:14px;outline:none;transition:border .2s;color:var(--text);font-family:inherit}
+.login-field input:focus{border-color:var(--navy);box-shadow:0 0 0 3px rgba(27,48,128,.1)}
+#loginErr{display:none;background:#FEF2F2;border:1px solid #FECACA;color:#DC2626;font-size:13px;padding:10px 14px;border-radius:8px;margin-bottom:16px;text-align:left}
+.btn-login{width:100%;padding:13px;background:var(--navy);color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer;letter-spacing:.4px;transition:background .2s;font-family:inherit}
+.btn-login:hover{background:var(--navy-dark)}
+#adminBar{display:none;max-width:900px;margin:0 auto 40px;padding:0 20px}
+.log-card{background:var(--white);border:1px solid var(--border);border-radius:14px;overflow:hidden;box-shadow:0 2px 12px rgba(27,48,128,.07)}
+.log-head{padding:16px 20px;display:flex;align-items:center;justify-content:space-between;gap:16px;border-bottom:2px solid var(--border);flex-wrap:wrap}
+.log-head h3{font-size:15px;font-weight:700;color:var(--navy);margin:0}
+.log-cnt{font-size:12px;color:var(--muted);font-weight:500;margin-left:6px}
+.log-actions{display:flex;gap:8px;flex-shrink:0}
+.btn-log{background:var(--navy);color:#fff;border:none;padding:8px 16px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;transition:background .2s;font-family:inherit}
+.btn-log:hover{background:var(--navy-dark)}
+.btn-refresh{background:var(--light);color:var(--navy);border:1.5px solid var(--border);padding:8px 14px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;transition:background .2s}
+.btn-refresh:hover{background:var(--border)}
+.log-wrap{overflow-x:auto}
+.log-tbl{width:100%;border-collapse:collapse;font-size:12.5px}
+.log-tbl th{background:#F8F9FF;color:var(--navy);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;padding:10px 16px;text-align:left;border-bottom:2px solid var(--border);white-space:nowrap}
+.log-tbl td{padding:10px 16px;border-bottom:1px solid var(--border);color:var(--text);vertical-align:middle}
+.log-tbl tr:last-child td{border-bottom:none}
+.log-tbl tbody tr:hover td{background:#F8F9FF}
+.log-portal{display:inline-block;padding:3px 9px;border-radius:20px;font-size:10.5px;font-weight:700;letter-spacing:.4px;white-space:nowrap}
+.log-portal.reliance{background:#E3F2FD;color:#1565C0}
+.log-portal.styleunion{background:#E8EAF6;color:#1A237E}
+.log-portal.max{background:#E8F5E9;color:#1B5E20}
+.log-empty{text-align:center;padding:36px;color:var(--muted);font-size:13px}
 </style>
 </head>
 <body>
+
+<!-- ── LOGIN OVERLAY ──────────────────────────────────────────────── -->
+<div id="loginOverlay">
+  <div class="login-box">
+    <img src="logo.png" alt="" style="width:70px;margin-bottom:16px;mix-blend-mode:multiply" onerror="this.style.display='none'">
+    <div style="font-size:10.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:2px;margin-bottom:8px">United Fashion &amp; Retail</div>
+    <h2 style="font-size:20px;font-weight:800;color:var(--navy);margin-bottom:6px">Portal Login</h2>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:24px">Sign in to access the documentation portal</p>
+    <div class="login-field">
+      <label for="loginUser">Username</label>
+      <input id="loginUser" type="text" placeholder="Enter username" autocomplete="username" onkeydown="if(event.key==='Enter')document.getElementById('loginPass').focus()">
+    </div>
+    <div class="login-field" style="margin-bottom:20px">
+      <label for="loginPass">Password</label>
+      <input id="loginPass" type="password" placeholder="Enter password" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
+    </div>
+    <div id="loginErr">Incorrect username or password. Please try again.</div>
+    <button class="btn-login" onclick="doLogin()">Sign In</button>
+    <p style="font-size:11px;color:var(--muted);margin-top:20px">&copy; 2025 United Fashion &amp; Retail Pvt. Ltd.</p>
+  </div>
+</div>
 
 <div class="strip"></div>
 
 <header class="site-header">
   <span class="company">United Fashion and Retail Pvt. Ltd.</span>
+  <div id="userInfo" style="display:flex;align-items:center;gap:10px"></div>
 </header>
 
 <section class="hero">
@@ -159,11 +212,141 @@ footer strong{color:var(--gold);font-weight:600}
   </div>
 </section>
 
+<!-- ── ADMIN LOG TABLE ─────────────────────────────────────────────── -->
+<div id="adminBar">
+  <div class="log-card">
+    <div class="log-head">
+      <div>
+        <h3>Download Log <span class="log-cnt" id="logCount"></span></h3>
+        <div style="font-size:12px;color:var(--muted);margin-top:2px">All portals combined — newest first</div>
+      </div>
+      <div class="log-actions">
+        <button class="btn-refresh" onclick="renderLog()">↻ Refresh</button>
+        <button class="btn-log" onclick="downloadLog()">Export CSV</button>
+      </div>
+    </div>
+    <div class="log-wrap">
+      <table class="log-tbl">
+        <thead>
+          <tr>
+            <th>Date &amp; Time</th>
+            <th>User</th>
+            <th>Portal</th>
+            <th>Type</th>
+            <th>File</th>
+          </tr>
+        </thead>
+        <tbody id="logBody">
+          <tr><td colspan="5" class="log-empty">No downloads logged yet.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
 <footer>
   &copy; 2025 <strong>United Fashion and Retail Pvt. Ltd.</strong> — All rights reserved
 </footer>
 
 <script>
+// ── USER ACCOUNTS ──────────────────────────────────────────────────────────
+// Add users here: 'username': 'password'
+// Admin users can see the Download Log (Export CSV button)
+const USERS = {
+  'admin':  'admin',
+  'payal':  'payal',
+  'tejal':  'tejal',
+  'alika':  'alika',
+  'ashika': 'ashika'
+};
+const ADMIN_USERS = ['admin'];
+const SESS_KEY   = 'ufr_session';
+const SESS_HOURS = 12;
+
+(function initAuth(){
+  const sess=getSession();
+  if(sess) showPortal(sess.user);
+})();
+
+function getSession(){
+  try{const s=JSON.parse(localStorage.getItem(SESS_KEY));if(s&&s.user&&Date.now()<s.expiry)return s;}catch(e){}return null;
+}
+
+function doLogin(){
+  const u=document.getElementById('loginUser').value.trim().toLowerCase();
+  const p=document.getElementById('loginPass').value;
+  const err=document.getElementById('loginErr');
+  err.style.display='none';
+  if(USERS[u]!==undefined&&USERS[u]===p){
+    localStorage.setItem(SESS_KEY,JSON.stringify({user:u,expiry:Date.now()+SESS_HOURS*3600000}));
+    showPortal(u);
+  }else{
+    err.style.display='block';
+    document.getElementById('loginPass').value='';
+    document.getElementById('loginPass').focus();
+  }
+}
+
+function showPortal(user){
+  document.getElementById('loginOverlay').style.display='none';
+  document.getElementById('userInfo').innerHTML=
+    '<span style="color:rgba(255,255,255,.75);font-size:12px;font-weight:500">👤 '+user+'</span>'+
+    '&nbsp;&nbsp;<button onclick="logout()" style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.22);color:#fff;padding:5px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">Sign Out</button>';
+  if(ADMIN_USERS.includes(user)){
+    document.getElementById('adminBar').style.display='block';
+    renderLog();
+  }
+}
+
+function logout(){
+  localStorage.removeItem(SESS_KEY);
+  location.reload();
+}
+
+function downloadLog(){
+  const logs=JSON.parse(localStorage.getItem('ufr_download_log')||'[]');
+  if(!logs.length){alert('No downloads have been logged yet.');return;}
+  const rows=[['Timestamp','User','Portal','Type','File']].concat(
+    logs.map(function(l){return[l.ts,l.user,l.portal,l.type,l.details||''];})
+  );
+  const csv=rows.map(function(r){
+    return r.map(function(c){return'"'+String(c).replace(/"/g,'""')+'"';}).join(',');
+  }).join('\r\n');
+  const a=document.createElement('a');
+  a.href='data:text/csv;charset=utf-8,﻿'+encodeURIComponent(csv);
+  a.download='portal_download_log_'+new Date().toISOString().slice(0,10)+'.csv';
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+}
+
+function renderLog(){
+  const logs=JSON.parse(localStorage.getItem('ufr_download_log')||'[]');
+  const tbody=document.getElementById('logBody');
+  const cnt=document.getElementById('logCount');
+  if(!tbody) return;
+  if(cnt) cnt.textContent=logs.length?'('+logs.length+')':'';
+  if(!logs.length){
+    tbody.innerHTML='<tr><td colspan="5" class="log-empty">No downloads logged yet.</td></tr>';
+    return;
+  }
+  const sorted=[...logs].reverse();
+  tbody.innerHTML=sorted.map(function(l){
+    const dt=new Date(l.ts);
+    const date=dt.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
+    const time=dt.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
+    const p=(l.portal||'').toLowerCase().replace(/\s+/g,'');
+    const cls=p.includes('reliance')?'reliance':p.includes('max')?'max':'styleunion';
+    return '<tr>'+
+      '<td style="white-space:nowrap">'+date+'<br><span style="font-size:11px;color:var(--muted)">'+time+'</span></td>'+
+      '<td style="font-weight:600">'+esc(l.user||'-')+'</td>'+
+      '<td><span class="log-portal '+cls+'">'+esc(l.portal||'-')+'</span></td>'+
+      '<td>'+esc(l.type||'-')+'</td>'+
+      '<td style="font-size:12px;color:var(--muted);word-break:break-all;max-width:220px">'+esc(l.details||'-')+'</td>'+
+      '</tr>';
+  }).join('');
+}
+
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
 function onBrandChange(){
   const sel=document.getElementById('brandSelect');
   document.getElementById('goBtn').disabled=!sel.value;
