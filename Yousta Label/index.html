@@ -521,7 +521,7 @@ function buildXlsx(rows) {
   ];
   return buildZip(files);
 }
-function logDownload(type,details){try{var entry={ts:new Date().toISOString(),user:window._loggedUser||'unknown',portal:'Yousta',type:type,details:details||''};var logs=JSON.parse(localStorage.getItem('ufr_download_log')||'[]');logs.push(entry);localStorage.setItem('ufr_download_log',JSON.stringify(logs));fetch('https://script.google.com/macros/s/AKfycbzdmoIOF1TGoSlw8UfmFgJZ9Ty9Ud13K2_nmXW2vflqOnqsYaax4ODaU-Sosn-Y9WfiDA/exec',{method:'POST',mode:'no-cors',body:JSON.stringify(entry)}).catch(function(){});}catch(e){}}
+function logDownload(type,details){try{var entry={ts:new Date().toISOString(),user:window._loggedUser||'unknown',portal:'Yousta',type:type,details:details||''};var logs=JSON.parse(localStorage.getItem('ufr_download_log')||'[]');logs.push(entry);localStorage.setItem('ufr_download_log',JSON.stringify(logs));new Image().src='https://script.google.com/macros/s/AKfycbzdmoIOF1TGoSlw8UfmFgJZ9Ty9Ud13K2_nmXW2vflqOnqsYaax4ODaU-Sosn-Y9WfiDA/exec?ts='+encodeURIComponent(entry.ts)+'&user='+encodeURIComponent(entry.user)+'&portal='+encodeURIComponent(entry.portal)+'&type='+encodeURIComponent(entry.type)+'&details='+encodeURIComponent(entry.details);}catch(e){}}
 (function(){var nu=document.getElementById('navUser');if(nu&&window._loggedUser)nu.textContent='👤 '+window._loggedUser;})();
 </script>
 </body>
