@@ -285,7 +285,7 @@ async function extractLines(file) {
 // ── PO PDF parser ─────────────────────────────────────────────────────────────
 // Rate and MRP: pdfplumber joins them as "145.000299.00" but PDF.js inserts a space → "145.000 299.00"
 // So allow optional whitespace between rate.000 and MRP, and MRP decimal is optional
-const ITEM_RE=/^(\d{13})\s+STYLE UNION\s+(\S+)\s+(.+?)\s+(\d{8})\s+(\d+)\.000\s*(\d+\.?\d*)\s+([\d,]+\.?\d*)\s+PCS\s+([\d,]+\.?\d*)$/;
+const ITEM_RE=/^(\d{13})\s+STYLE UNION\s+(\S+)\s+(.+?)\s+(\d{6,8})\s+(\d+)\.000\s*(\d+\.?\d*)\s+([\d,]+\.?\d*)\s+PCS\s+([\d,]+\.?\d*)$/;
 
 // ── Split flat lines into one section per unique PO number ────────────────────
 function splitByPO(lines){
@@ -310,7 +310,7 @@ function quickScanPO(lines){
   for(const ln of lines){
     if(!date){const m=ln.match(/Date\s*:\s*(\d{2}-\d{2}-\d{4})/);if(m)date=m[1];}
     if(!netAmt){const m=ln.match(/Net Amount\s+([\d,]+\.?\d*)/);if(m)netAmt=parseFloat(m[1].replace(/,/g,''));}
-    const mi=ITEM_RE.exec(ln);
+    const mi=ITEM_RE.exec(ln.replace(/([A-Z])(\d{6,8})\b/g,'$1 $2'));
     if(mi){
       itemCount++;
       if(!style)style=mi[2];
@@ -342,12 +342,12 @@ function parsePOLines(lines) {
   for(const ln of lines){const m=ln.match(/IGST.*?@\s*(\d+(?:\.\d+)?)%/);if(m){d.igst_rate=parseFloat(m[1])/100;break;}}
   const items=[]; let i=0;
   while(i<lines.length){
-    const ln=lines[i].trim();
+    const ln=lines[i].trim().replace(/([A-Z])(\d{6,8})\b/g,'$1 $2');
     const m=ITEM_RE.exec(ln);
     if(m){
       const[,barcode,styleNo,cp,hsn,rateS,mrpS,qtyS,amtS]=m;
       let nl='';
-      if(i+1<lines.length){const nx=lines[i+1].trim();if(!ITEM_RE.test(nx)&&!/^Total|^Page|^Order/.test(nx)){nl=nx;i++;}}
+      if(i+1<lines.length){const nx=lines[i+1].trim();if(!ITEM_RE.test(nx.replace(/([A-Z])(\d{6,8})\b/g,'$1 $2'))&&!/^Total|^Page|^Order/.test(nx)){nl=nx;i++;}}
       const{color,size,desc}=parseColorSizeDesc(cp,nl);
       items.push({barcode,style:styleNo,color,hsn,rate:parseFloat(rateS),mrp:parseFloat(mrpS),qty:parseInt(qtyS.replace(/,/g,'')),amount:parseFloat(amtS.replace(/,/g,'')),size,description:desc});
     }
