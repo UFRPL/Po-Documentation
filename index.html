@@ -137,6 +137,7 @@ footer strong{color:var(--gold);font-weight:600}
 .log-portal.reliance{background:#E3F2FD;color:#1565C0}
 .log-portal.styleunion{background:#E8EAF6;color:#1A237E}
 .log-portal.max{background:#E8F5E9;color:#1B5E20}
+.log-portal.v2{background:#FFF3E0;color:#E65100}
 .log-empty{text-align:center;padding:36px;color:var(--muted);font-size:13px}
 </style>
 </head>
@@ -196,6 +197,7 @@ footer strong{color:var(--gold);font-weight:600}
         <option value="Ritu Kumar-AVAASA Label/index.html">Ritu Kumar – AVAASA Label</option>
         <option value="Azorte Label/index.html">Azorte Label</option>
         <option value="Yousta Label/index.html">Yousta Label</option>
+        <option value="v2/PO to Invoice and Packing List.html">V2</option>
       </select>
       <span class="select-arrow">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
@@ -342,7 +344,7 @@ function renderLog(){
     const date=dt.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
     const time=dt.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
     const p=(l.portal||'').toLowerCase().replace(/\s+/g,'');
-    const cls=p.includes('reliance')?'reliance':p.includes('max')?'max':'styleunion';
+    const cls=p.includes('reliance')?'reliance':p.includes('max')?'max':p.includes('v2')?'v2':'styleunion';
     return '<tr>'+
       '<td style="white-space:nowrap">'+date+'<br><span style="font-size:11px;color:var(--muted)">'+time+'</span></td>'+
       '<td style="font-weight:600">'+esc(l.user||'-')+'</td>'+
