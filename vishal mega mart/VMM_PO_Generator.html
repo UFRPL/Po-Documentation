@@ -620,7 +620,7 @@ function computeCartons({ looseLines, bundle, piecesPerCarton, packsPerCarton })
 
   // ---- Loose cartons ----
   const remainderPool = [];
-  for (const line of looseLines) {
+  for (const line of looseLines.slice().sort(bySizeOrder)) {
     const qty = line.shippedQty || 0;
     if (qty <= 0) continue;
     const cap = piecesPerCarton || 1;
