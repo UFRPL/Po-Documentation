@@ -583,11 +583,22 @@ function parsePO(items) {
 // consolidated into as few extra "mixed" cartons as possible (mirrors how VMM's sample shipment was packed).
 // Prepack (ratio-bundle) cartons pack at `packsPerCarton` packs of the PO's own fixed size ratio.
 
+const SIZE_ORDER = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'];
+function bySizeOrder(a, b) {
+  const ai = SIZE_ORDER.indexOf(a.size);
+  const bi = SIZE_ORDER.indexOf(b.size);
+  if (ai === -1 && bi === -1) return a.size < b.size ? -1 : a.size > b.size ? 1 : 0;
+  if (ai === -1) return 1;
+  if (bi === -1) return -1;
+  return ai - bi;
+}
+
 function computeCartons({ looseLines, bundle, piecesPerCarton, packsPerCarton }) {
   const cartons = [];
 
   // ---- Prepack bundle cartons ----
   if (bundle && bundle.shippedPacks > 0) {
+    const ratio = bundle.ratio.slice().sort(bySizeOrder);
     const ppc = packsPerCarton || 1;
     const fullCartons = Math.floor(bundle.shippedPacks / ppc);
     const remainderPacks = bundle.shippedPacks - fullCartons * ppc;
@@ -595,14 +606,14 @@ function computeCartons({ looseLines, bundle, piecesPerCarton, packsPerCarton })
       cartons.push({
         type: 'prepack',
         packsInCarton: ppc,
-        contents: bundle.ratio.map(r => ({ size: r.size, articleNo: r.articleNo, ean: r.ean, color: r.color, qty: r.qtyPerPack * ppc })),
+        contents: ratio.map(r => ({ size: r.size, articleNo: r.articleNo, ean: r.ean, color: r.color, qty: r.qtyPerPack * ppc })),
       });
     }
     if (remainderPacks > 0) {
       cartons.push({
         type: 'prepack',
         packsInCarton: remainderPacks,
-        contents: bundle.ratio.map(r => ({ size: r.size, articleNo: r.articleNo, ean: r.ean, color: r.color, qty: r.qtyPerPack * remainderPacks })),
+        contents: ratio.map(r => ({ size: r.size, articleNo: r.articleNo, ean: r.ean, color: r.color, qty: r.qtyPerPack * remainderPacks })),
       });
     }
   }
