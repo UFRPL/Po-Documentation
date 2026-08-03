@@ -314,6 +314,24 @@ tfoot td.lft{text-align:left}
     <input type="file" id="fi" accept=".xlsx,.xls" style="display:none"/>
     <span class="url-status" id="url-status"></span>
   </div>
+
+  <div style="display:flex;align-items:center;gap:14px;width:100%;max-width:400px;color:var(--td);font-size:.7rem;letter-spacing:1.5px;text-transform:uppercase">
+    <div style="flex:1;height:1px;background:var(--border)"></div>OR<div style="flex:1;height:1px;background:var(--border)"></div>
+  </div>
+
+  <div class="drop-zone" id="dzpdf" style="border-color:rgba(16,185,129,.35)">
+    <div class="dz-icon" style="border-color:rgba(16,185,129,.4)">
+      <svg width="22" height="22" fill="none" stroke="#10b981" stroke-width="2" viewBox="0 0 24 24">
+        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/>
+        <line x1="9" y1="15" x2="15" y2="15"/><line x1="9" y1="11" x2="12" y2="11"/>
+      </svg>
+    </div>
+    <h3>Generate directly from a PO PDF</h3>
+    <p>Drop a Reliance PO PDF — we'll extract everything and get it ready for invoice, packing list &amp; sticker generation</p>
+    <button class="btn-browse" style="background:#059669" onclick="document.getElementById('fipdf').click()">Browse PO PDF</button>
+    <input type="file" id="fipdf" accept=".pdf" style="display:none"/>
+    <span class="url-status" id="pdf-status"></span>
+  </div>
 </div>
 
 <!-- ══ DASHBOARD ═════════════════════════════════════════════ -->
@@ -600,6 +618,221 @@ const dz=document.getElementById('dz');
 dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('dg')});
 dz.addEventListener('dragleave',()=>dz.classList.remove('dg'));
 dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('dg');if(e.dataTransfer.files[0])load(e.dataTransfer.files[0])});
+
+/* ══ GENERATE DIRECTLY FROM PO PDF ═══════════════════════════
+   Parses a full Reliance PO PDF (all line items, sizes, HSN, MRP,
+   base cost, site/GSTIN, format) into rows shaped exactly like the
+   Excel mastersheet, then feeds them through the SAME pipeline
+   (ALL → initDropdowns → applyF → dashboard → openModal → genExcel/
+   genStickerOnly/genSummary) used by the Excel-upload flow — no
+   downstream function needed to change. ══════════════════════ */
+document.getElementById('fipdf').addEventListener('change',function(){loadPDF(this.files[0])});
+const dzpdf=document.getElementById('dzpdf');
+dzpdf.addEventListener('dragover',e=>{e.preventDefault();dzpdf.classList.add('dg')});
+dzpdf.addEventListener('dragleave',()=>dzpdf.classList.remove('dg'));
+dzpdf.addEventListener('drop',e=>{e.preventDefault();dzpdf.classList.remove('dg');if(e.dataTransfer.files[0])loadPDF(e.dataTransfer.files[0])});
+
+const _SIZE_MAP={S:'S',M:'M',L:'L',XL:'XL',XXL:'XXL','2XL':'XXL','3XL':'XXL','XXXL':'XXL',FREE:'XXL',F:'XXL'};
+
+async function loadPDF(f){
+  if(!f)return;
+  if(!/\.pdf$/i.test(f.name)){toast('Please choose a PDF file.');return;}
+  document.getElementById('pdf-status').textContent='Reading '+f.name+'…';
+  toast('Parsing PO PDF…');
+  try{
+    const parsed=await parsePOFullPdf(f);
+    if(!parsed.items.length){
+      toast('⚠ Could not find any line items in this PDF — is it a Reliance PO?');
+      document.getElementById('pdf-status').textContent='';
+      return;
+    }
+    if(parsed.grandTotalQty!=null && Math.round(parsed.sumQty)!==Math.round(parsed.grandTotalQty)){
+      toast(`⚠ Parsed ${fmt(parsed.sumQty)} pcs but PO states ${fmt(parsed.grandTotalQty)} — please double-check quantities before generating.`);
+    }
+    const rows=poItemsToRows(parsed);
+    // Same field normalisation load() applies to Excel rows — required so
+    // _name/_colour/_loc (used for grouping, filters & display) are set.
+    rows.forEach(r=>{
+      if(r['SKU']&&String(r['SKU']).trim()){
+        r._name=String(r['SKU']).trim();
+      } else {
+        const d=String(r['PRODUCT_DESCRIPTION']||'');
+        const parts=d.split(', ');
+        r._name=parts.length>1?parts.slice(0,-1).join(', '):d;
+      }
+      r._loc=String(r['location']||r['Location']||r['DC_CODE']||'').trim();
+      r._colour=String(r['Colour']||'').trim();
+    });
+    document.getElementById('fname').textContent=f.name+' (from PDF)';
+    ALL=rows;
+    Object.keys(SEL).forEach(k=>SEL[k]=[]);
+    initDropdowns();applyF();
+    document.getElementById('up').style.display='none';
+    document.getElementById('dash').style.display='block';
+    document.getElementById('pdf-status').textContent='';
+    toast(`✓ PO ${parsed.poNumber} — ${parsed.items.length} line item(s), ${fmt(parsed.sumQty)} pcs. Review and click "Generate Invoice".`);
+  }catch(err){
+    console.error('PDF parse failed:',err);
+    document.getElementById('pdf-status').textContent='';
+    toast('✗ Could not parse this PO PDF: '+(err.message||err));
+  }
+}
+
+/* ── Full line-item PO PDF parser ──
+   Groups pdf.js text items into reading-order lines, then matches the
+   repeating 3–4 line block Reliance uses per item row:
+     L1: Sr.No  Article No.  EAN No.  <desc...>  Qty.000  EA  MRP  BaseCost  IGST%  IGST  TotalBaseValue
+     L2: HSN Code  Vendor Article No.  <desc remainder>  CESS%  CESS
+     L3: Delivery Date  CessFxdRt  CessFxdVl
+     L4: Site
+   Non-greedy description capture makes this robust to wherever the
+   description happens to wrap. ── */
+async function parsePOFullPdf(file){
+  const buf=await file.arrayBuffer();
+  const pdf=await pdfjsLib.getDocument({data:buf}).promise;
+
+  const allLines=[];
+  for(let p=1;p<=pdf.numPages;p++){
+    const page=await pdf.getPage(p);
+    const tc=await page.getTextContent();
+    const items=tc.items.map(i=>({t:i.str,x:i.transform[4],y:Math.round(i.transform[5])})).filter(i=>i.t.trim().length>0);
+    items.sort((a,b)=>b.y-a.y||a.x-b.x);
+    let curY=null,curLine=[];
+    for(const it of items){
+      if(curY===null||Math.abs(it.y-curY)<=2){curLine.push(it.t);if(curY===null)curY=it.y;}
+      else{allLines.push(curLine.join(' ').replace(/\s+/g,' ').trim());curLine=[it.t];curY=it.y;}
+    }
+    if(curLine.length)allLines.push(curLine.join(' ').replace(/\s+/g,' ').trim());
+  }
+  const fullFlat=allLines.join(' ');
+
+  const poM=fullFlat.match(/PO\s*NO\.?\s*:\s*(\d{9,12})/i)||fullFlat.match(/Number\s*:\s*(\d{9,12})/i);
+  const poNumber=poM?poM[1]:'';
+  const poDateM=fullFlat.match(/PO\s*Date\s*:\s*(\d{2}\.\d{2}\.\d{4})/i);
+  const poDate=poDateM?poDateM[1]:'';
+  const vendorCodeM=fullFlat.match(/Vendor\s*Code\s*:\s*(\d+)/i);
+  const supplierCode=vendorCodeM?vendorCodeM[1]:'10337044';
+
+  const ITEM_RE=/^(\d{1,3})\s+(\d{10,14})\s+(\d{12,14})\s+(.+?)\s+([\d,]+\.\d{3})\s+EA\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})\s+([\d.]+)\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})$/;
+  // Some line items (esp. Ratio-Pack / "(RP)" orders) fit their whole description on
+  // line 1, so line 2 is HSN + VendorArticle + DeliveryDate directly (no desc remainder) —
+  // try that shape first, then fall back to the "desc remainder before 2 trailing numbers" shape.
+  const HSN_RE_NODESC=/^(\d{6,8})\s+(\S+)\s+(\d{2}\.\d{2}\.\d{4})\s+([\d.]+)\s+([\d.]+)$/;
+  const HSN_RE_WITHDESC=/^(\d{6,8})\s+(\S+)\s+(.+?)\s+([\d.]+)\s+([\d.]+)$/;
+  const DATE_RE=/^(\d{2}\.\d{2}\.\d{4})\s+([\d.]+)\s+([\d.]+)$/;
+  // Site line sometimes stands alone ("SZAF"), sometimes has trailing CESS numbers ("SZAF 0.00 0.00")
+  const SITE_RE=/^([A-Z][A-Z0-9]{2,5})(?:\s+[\d.]+)*$/;
+  // "Ratio Pack" group-header row that precedes the real per-size rows for an RP style,
+  // e.g. "1 494548712 8909284451893 441853743NAVY(RP) 157.000 EA 0.00 0.00 0.00 0.00"
+  // (shorter article code, description tagged "(RP)", no Total Base Value column).
+  const RP_GROUP_RE=/^\d{1,3}\s+\d{5,9}\s+\d{12,14}\s+.*\(RP\)/i;
+
+  const items=[];
+  const siteCodesSeen=new Set();
+  let pendingRP=false;
+
+  for(let i=0;i<allLines.length;i++){
+    if(RP_GROUP_RE.test(allLines[i])){pendingRP=true;continue;}
+    const m=allLines[i].match(ITEM_RE);
+    if(!m)continue;
+    const[,srNo,articleNo,eanNo,descPart1,qtyStr,mrpStr,baseCostStr,igstPctStr,igstAmtStr,totBaseStr]=m;
+    let hsn='',vendorArticleNo='',descPart2='',deliveryDate='',site='';
+    for(let j=i+1;j<Math.min(i+6,allLines.length);j++){
+      const ln2=allLines[j];
+      if(ITEM_RE.test(ln2)||RP_GROUP_RE.test(ln2))break;
+      if(!hsn){
+        const hm1=ln2.match(HSN_RE_NODESC);
+        if(hm1){hsn=hm1[1];vendorArticleNo=hm1[2];deliveryDate=hm1[3];continue;}
+        const hm2=ln2.match(HSN_RE_WITHDESC);
+        if(hm2){hsn=hm2[1];vendorArticleNo=hm2[2];descPart2=hm2[3];continue;}
+      }
+      if(!deliveryDate){const dm=ln2.match(DATE_RE);if(dm){deliveryDate=dm[1];continue;}}
+      if(!site){const sm=ln2.match(SITE_RE);if(sm){site=sm[1];continue;}}
+    }
+    if(site)siteCodesSeen.add(site);
+
+    const fullDesc=(descPart1+' '+descPart2).replace(/\s+/g,' ').trim();
+    const parts=fullDesc.replace(/,\s*$/,'').split(',').map(s=>s.trim()).filter(Boolean);
+    let styleCode='',colour='',sizeLabel='';
+    if(parts.length>=3){sizeLabel=parts[parts.length-1];colour=parts[parts.length-2];styleCode=parts.slice(0,parts.length-2).join(', ');}
+    else if(parts.length===2){sizeLabel=parts[1];styleCode=parts[0];}
+    else{styleCode=fullDesc;}
+
+    // fix PO's own inconsistent description truncation using the reliable Vendor Article No column
+    if(vendorArticleNo&&vendorArticleNo.length>=4){
+      const anchor=vendorArticleNo.slice(0,4);
+      const idx=styleCode.search(new RegExp(anchor.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')));
+      if(idx>=0)styleCode=styleCode.slice(0,idx)+vendorArticleNo;
+    }
+
+    items.push({
+      srNo:+srNo,articleNo,eanNo,styleCode,colour,sizeLabel,
+      qty:parseFloat(qtyStr.replace(/,/g,'')),
+      mrp:parseFloat(mrpStr.replace(/,/g,'')),
+      baseCost:parseFloat(baseCostStr.replace(/,/g,'')),
+      igstPct:parseFloat(igstPctStr),
+      hsn,vendorArticleNo,deliveryDate,site,
+      isRP:pendingRP
+    });
+  }
+
+  // Fallback signal: a style whose per-size quantities are all identical is a
+  // ratio pack even if the "(RP)" tag wasn't picked up (defense in depth).
+  const byGroup={};
+  items.forEach(it=>{const k=it.site+'||'+it.styleCode;(byGroup[k]=byGroup[k]||[]).push(it);});
+  Object.values(byGroup).forEach(grp=>{
+    if(grp.length>=2&&grp.every(it=>it.qty===grp[0].qty))grp.forEach(it=>it.isRP=true);
+  });
+
+  // Annexure "For Site Details" — GSTIN per site (the "Format" column there is a
+  // store/site classification like "Value DC", NOT the RP-vs-DC pack/invoice type —
+  // that's determined above from the "(RP)" tag / uniform-quantity heuristic instead).
+  const annexIdx=fullFlat.search(/Annexure\s*For\s*Site\s*Details/i);
+  const annexText=annexIdx>=0?fullFlat.slice(annexIdx):'';
+  const siteInfo={};
+  for(const code of siteCodesSeen){
+    const mm=annexText.match(new RegExp(code+'([\\s\\S]{0,400}?)([0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z])'));
+    siteInfo[code]={gstin:mm?mm[2]:''};
+  }
+
+  const gtM=fullFlat.match(/Grand\s*Total\s*of\s*Qty\s+([\d,]+\.\d+)/i);
+  const grandTotalQty=gtM?parseFloat(gtM[1].replace(/,/g,'')):null;
+  const sumQty=items.reduce((s,it)=>s+it.qty,0);
+
+  return{poNumber,poDate,supplierCode,items,siteInfo,grandTotalQty,sumQty};
+}
+
+/* ── Convert parsed PO items into mastersheet-shaped rows (same keys load() produces) ──
+   IMPORTANT: for "RP" (Ratio Pack) styles the PDF still lists per-piece qty and
+   per-piece Base Cost (verified: qty × baseCost = the PDF's own Total Base Value
+   for that size row). But the invoice/sticker generator's RP path (fillRPInvSheet)
+   expects the mastersheet's LANDING_COST_INCL_TAX_PER_UNIT to be the cost of one
+   whole 5-piece pack (S+M+L+XL+XXL) and divides by 5 to get the per-piece rate back
+   — so we scale the per-piece Base Cost ×5 here for RP rows only. MRP stays per-piece
+   (it's a retail price tag, never a pack price) — no scaling needed. */
+function poItemsToRows(parsed){
+  return parsed.items.map(it=>{
+    const sizeKey=_SIZE_MAP[(it.sizeLabel||'').toUpperCase().replace(/\s+/g,'')]||'XXL';
+    const orderType=it.isRP?'RP':'DC';
+    const landingCost=it.isRP?it.baseCost*5:it.baseCost;
+    const row={
+      'DC_CODE':it.site,'location':it.site,'Location':it.site,
+      'Order type':orderType,
+      'MASTER PRODUCT CODE':it.styleCode,'SKU':it.styleCode,
+      'PRODUCT_CODE':it.articleNo,'EAN_NO':it.eanNo,
+      'HSN':it.hsn||'','MRP_PER_UNIT':it.mrp,
+      'LANDING_COST_INCL_TAX_PER_UNIT':landingCost,'TAX_PER':it.igstPct,
+      'PRODUCT_DESCRIPTION':`${it.styleCode}, ${it.colour}, ${sizeKey}`,
+      'RP DESCRPTION':it.styleCode,'Colour':it.colour,
+      'PURCH_ORDER_NUMBER':parsed.poNumber,'PURCH_ORDER_DATE':parsed.poDate,
+      'SUPPLIER_CODE':parsed.supplierCode,
+      'COST_PRICE_INCL_TAX_PER_PO_OU':it.qty*it.baseCost*(1+(it.igstPct||0)/100),
+      S:0,M:0,L:0,XL:0,XXL:0
+    };
+    row[sizeKey]=it.qty;
+    return row;
+  });
+}
 
 function load(f){
   if(!f)return;
