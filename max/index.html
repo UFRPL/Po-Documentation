@@ -265,16 +265,22 @@ async function parseExcelPO(file) {
   const rate     = parseFloat(first[col['Basic Cost']]) || 0;
   const mrp      = parseFloat(first[col['MRP']]) || 0;
 
-  // Group quantities + EANs by DC
+  // Group quantities + EANs by DC; collect item codes globally (same per size across all DCs)
   const locMap = {}, locOrder = [];
+  const singleArticleCodes = {};  // size → Item ID (13-digit)
   for (const row of dataRows) {
     const locId   = String(row[col['Loc ID']] || '').trim();
     const locName = String(row[col['Location Name']] || '').trim();
     const size    = String(row[col['Size']] || '').trim().toUpperCase();
     const qty     = parseFloat(row[col['Order Qty']]) || 0;
     const ean     = String(row[col['EAN Code']] || '').trim();
+    const itemId  = String(row[col['Item ID']] || '').trim();
 
-    if (!size || qty <= 0) continue;
+    if (!size) continue;
+    // Capture item code per size (Item ID is same across DCs for the same size)
+    if (itemId && !singleArticleCodes[size]) singleArticleCodes[size] = itemId;
+
+    if (qty <= 0) continue;
     const gstin = locToGSTIN(locId, locName);
     if (!gstin) continue;
 
@@ -288,6 +294,10 @@ async function parseExcelPO(file) {
 
   if (!locOrder.length) throw new Error('No recognised DC locations found — check Loc ID / Location Name in the Excel');
 
+  // Derive prefix from any captured item code (first 10 digits)
+  const anyCode = Object.values(singleArticleCodes)[0] || '';
+  const singleArticlePrefix = anyCode.slice(0, 10);
+
   return {
     poNumber, orderDate,
     supplierGSTIN: SUP.gstin,
@@ -297,7 +307,7 @@ async function parseExcelPO(file) {
     itemDesc: '',   // ⚠️ not in Excel — enter manually
     colour,
     prepackRatio: { S:2, M:2, L:2, XL:1, XXL:1 },  // default — verify manually
-    prepackArticle: '', singleArticlePrefix: '', singleArticleCodes: {},
+    prepackArticle: '', singleArticlePrefix, singleArticleCodes,
     locations: locOrder.map(g => locMap[g]),
   };
 }
