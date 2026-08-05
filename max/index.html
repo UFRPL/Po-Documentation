@@ -1932,7 +1932,8 @@ async function makeStickers(locsData,poData,selectedGstins,maxPcs,ppWt,boxWt){
             border
           };
         }
-        if(tmplWs['!rows']&&tmplWs['!rows'][r]) ws['!rows'][off+r]={...tmplWs['!rows'][r]};
+        // Copy template row height; fall back to 15pt so rows with no explicit height aren't collapsed
+        ws['!rows'][off+r]=(tmplWs['!rows']&&tmplWs['!rows'][r])?{...tmplWs['!rows'][r]}:{hpt:15};
       }
       for(const m of (tmplWs['!merges']||[])){
         ws['!merges'].push({s:{r:off+m.s.r,c:m.s.c},e:{r:off+m.e.r,c:m.e.c}});
@@ -2006,6 +2007,11 @@ async function makeStickers(locsData,poData,selectedGstins,maxPcs,ppWt,boxWt){
           if(ws[a]&&ws[a].s) refRowStyle[c]=JSON.parse(JSON.stringify(ws[a].s));
         }
 
+        // Per-row horizontal merges matching the template's column groupings:
+        // A-B (0-1) = item code, C-E (2-4) = description, F-H (5-7) = size,
+        // I-J (8-9) = singles, L-M (11-12) = master bag / pcs columns
+        const MIX_ROW_MERGES=[[0,1],[2,4],[5,7],[8,9],[11,12]];
+
         mixSizes.forEach((sz,si)=>{
           const r=17+si;
           // Fix row height — template rows 18-21 are tiny
@@ -2019,6 +2025,10 @@ async function makeStickers(locsData,poData,selectedGstins,maxPcs,ppWt,boxWt){
               ? JSON.parse(JSON.stringify(refRowStyle[c]))
               : {font:{name:'Arial',sz:12,bold:true},alignment:{horizontal:'center',vertical:'center'},border:{}};
             ws[a].s.font.bold=true;
+          }
+          // Add per-row horizontal merges for this size row
+          for(const [cs,ce] of MIX_ROW_MERGES){
+            ws['!merges'].push({s:{r:off+r,c:cs},e:{r:off+r,c:ce}});
           }
           set(r,0,artMap[sz]||'');
           set(r,2,poData.styleNo||'');
