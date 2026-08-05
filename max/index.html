@@ -70,13 +70,13 @@ table.sz input{width:80px;padding:4px 5px;border:1px solid var(--border);border-
 <div class="wrap">
 
 <div class="card">
-  <div class="card-title">Step 1 — Upload MAX Purchase Order PDF</div>
+  <div class="card-title">Step 1 — Upload MAX Purchase Order</div>
   <div class="drop" id="drop" onclick="document.getElementById('fi').click()">
     <div class="icon">📄</div>
-    <strong>Click to choose PDF &nbsp;or&nbsp; drag &amp; drop</strong>
-    <p style="color:var(--muted);margin-top:5px">Supports MAX / Lifestyle International PO PDFs</p>
+    <strong>Click to choose file &nbsp;or&nbsp; drag &amp; drop</strong>
+    <p style="color:var(--muted);margin-top:5px">Accepts MAX PO PDFs or Excel files (.xlsx)</p>
   </div>
-  <input type="file" id="fi" accept=".pdf" style="display:none">
+  <input type="file" id="fi" accept=".pdf,.xlsx" style="display:none">
   <div id="upSt" class="status"></div>
 </div>
 
@@ -183,8 +183,8 @@ let parsedData = null;
 const dropEl = document.getElementById('drop');
 dropEl.addEventListener('dragover', e=>{e.preventDefault();dropEl.classList.add('over')});
 dropEl.addEventListener('dragleave', ()=>dropEl.classList.remove('over'));
-dropEl.addEventListener('drop', e=>{e.preventDefault();dropEl.classList.remove('over');const f=e.dataTransfer.files[0];if(f&&f.name.endsWith('.pdf'))uploadPDF(f);else showSt('upSt','Please drop a PDF file.','err')});
-document.getElementById('fi').addEventListener('change',e=>{if(e.target.files[0])uploadPDF(e.target.files[0])});
+dropEl.addEventListener('drop', e=>{e.preventDefault();dropEl.classList.remove('over');const f=e.dataTransfer.files[0];if(!f)return;if(f.name.endsWith('.xlsx'))uploadExcel(f);else if(f.name.endsWith('.pdf'))uploadPDF(f);else showSt('upSt','Please drop a PDF or Excel (.xlsx) file.','err')});
+document.getElementById('fi').addEventListener('change',e=>{const f=e.target.files[0];if(!f)return;if(f.name.endsWith('.xlsx'))uploadExcel(f);else uploadPDF(f)});
 
 function showSt(id,msg,type){const el=document.getElementById(id);el.textContent=msg;el.className='status '+type;el.style.display='block'}
 function hideSt(id){document.getElementById(id).style.display='none'}
@@ -198,6 +198,108 @@ async function uploadPDF(file){
     populateForm(data);
     showSt('upSt','✅ Parsed PO '+data.poNumber+' — '+data.locations.length+' location(s) found','ok');
   }catch(e){showSt('upSt','❌ '+e.message,'err');console.error(e)}
+}
+
+// ─── EXCEL PARSER ────────────────────────────────────────
+const LOC_ID_TO_GSTIN = {
+  '9936': '27AAACL2937J1ZE',  // MF-RDC-West-Bhiwandi
+  '9937': '19AAACL2937J1ZB',  // MF-RDC-East-Kolkata
+  '9934': '29AAACL2937J1ZA',  // MF-RDC-South-Bengaluru
+  '9930': '09AAACL2937J1ZC',  // MF-RDC-North-Ghaziabad
+};
+const LOC_NAME_GSTIN = {
+  'Bhiwandi':  '27AAACL2937J1ZE',
+  'Kolkata':   '19AAACL2937J1ZB',
+  'Bengaluru': '29AAACL2937J1ZA',
+  'Ghaziabad': '09AAACL2937J1ZC',
+};
+
+function locToGSTIN(locId, locName) {
+  const byId = LOC_ID_TO_GSTIN[String(locId || '').trim()];
+  if (byId) return byId;
+  for (const [key, gstin] of Object.entries(LOC_NAME_GSTIN)) {
+    if (locName && locName.includes(key)) return gstin;
+  }
+  return null;
+}
+
+async function uploadExcel(file) {
+  showSt('upSt', '⏳ Parsing Excel…', 'info');
+  dropEl.querySelector('strong').textContent = '📊 ' + file.name;
+  try {
+    const data = await parseExcelPO(file);
+    parsedData = data;
+    populateForm(data);
+    showSt('upSt', '✅ Parsed PO ' + data.poNumber + ' — ' + data.locations.length + ' location(s) found. ⚠️ Verify HSN, Item Description and Prepack Ratio below.', 'ok');
+  } catch(e) { showSt('upSt', '❌ ' + e.message, 'err'); console.error(e); }
+}
+
+async function parseExcelPO(file) {
+  const buf = await file.arrayBuffer();
+  const wb = XLSX.read(buf, { type: 'array' });
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
+  if (rows.length < 2) throw new Error('Excel file appears empty');
+
+  const header = rows[0].map(h => h ? String(h).trim() : '');
+  const col = {};
+  header.forEach((h, i) => { col[h] = i; });
+
+  const need = ['Order No', 'Loc ID', 'Location Name', 'EAN Code', 'Colour', 'Size', 'Basic Cost', 'MRP', 'Order Qty'];
+  const missing = need.filter(k => col[k] === undefined);
+  if (missing.length) throw new Error('Missing columns in Excel: ' + missing.join(', '));
+
+  const dataRows = rows.slice(1).filter(r => r[col['Order No']] != null);
+  if (!dataRows.length) throw new Error('No data rows found in Excel');
+
+  const first = dataRows[0];
+  const poNumber = String(first[col['Order No']] || '');
+
+  // "7/3/2026, 12:00:00 AM" → "03.07.2026"
+  let orderDate = '';
+  const dm = String(first[col['Order Date']] || '').match(/(\d+)\/(\d+)\/(\d{4})/);
+  if (dm) orderDate = dm[2].padStart(2,'0') + '.' + dm[1].padStart(2,'0') + '.' + dm[3];
+
+  const styleNo  = String(first[col['VPN']] || first[col['Style ID']] || '');
+  const colour   = String(first[col['Colour']] || '');
+  const rate     = parseFloat(first[col['Basic Cost']]) || 0;
+  const mrp      = parseFloat(first[col['MRP']]) || 0;
+
+  // Group quantities + EANs by DC
+  const locMap = {}, locOrder = [];
+  for (const row of dataRows) {
+    const locId   = String(row[col['Loc ID']] || '').trim();
+    const locName = String(row[col['Location Name']] || '').trim();
+    const size    = String(row[col['Size']] || '').trim().toUpperCase();
+    const qty     = parseFloat(row[col['Order Qty']]) || 0;
+    const ean     = String(row[col['EAN Code']] || '').trim();
+
+    if (!size || qty <= 0) continue;
+    const gstin = locToGSTIN(locId, locName);
+    if (!gstin) continue;
+
+    if (!locMap[gstin]) {
+      locMap[gstin] = { name: STICKER_LOC[gstin] || locName, gstin, items: {}, eans: {}, address_lines: KNOWN_ADDR[gstin] || ['','',''] };
+      locOrder.push(gstin);
+    }
+    locMap[gstin].items[size] = (locMap[gstin].items[size] || 0) + qty;
+    if (ean && !locMap[gstin].eans[size]) locMap[gstin].eans[size] = ean;
+  }
+
+  if (!locOrder.length) throw new Error('No recognised DC locations found — check Loc ID / Location Name in the Excel');
+
+  return {
+    poNumber, orderDate,
+    supplierGSTIN: SUP.gstin,
+    rate, mrp,
+    hsn: '',        // ⚠️ not in Excel — enter manually
+    styleNo,
+    itemDesc: '',   // ⚠️ not in Excel — enter manually
+    colour,
+    prepackRatio: { S:2, M:2, L:2, XL:1, XXL:1 },  // default — verify manually
+    prepackArticle: '', singleArticlePrefix: '', singleArticleCodes: {},
+    locations: locOrder.map(g => locMap[g]),
+  };
 }
 
 // ─── PDF PARSER ──────────────────────────────────────────
