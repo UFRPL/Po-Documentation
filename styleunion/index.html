@@ -285,7 +285,7 @@ async function extractLines(file) {
 // ── PO PDF parser ─────────────────────────────────────────────────────────────
 // Rate and MRP: pdfplumber joins them as "145.000299.00" but PDF.js inserts a space → "145.000 299.00"
 // So allow optional whitespace between rate.000 and MRP, and MRP decimal is optional
-const ITEM_RE=/^(\d{13})\s+STYLE UNION\s+(\S+)\s+(.+?)\s+(\d{6,8})\s+(\d+)\.000\s*(\d+\.?\d*)\s+([\d,]+\.?\d*)\s+PCS\s+([\d,]+\.?\d*)$/;
+const ITEM_RE=/^(\d{13})\s+(?:STYLE UNION|ETHNICITY)\s+(\S+)\s+(.+?)\s+(\d{6,8})\s+(\d+)\.000\s*(\d+\.?\d*)\s+([\d,]+\.?\d*)\s+PCS\s+([\d,]+\.?\d*)$/;
 
 // ── Split flat lines into one section per unique PO number ────────────────────
 function splitByPO(lines){
