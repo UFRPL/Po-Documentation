@@ -329,15 +329,27 @@ function parsePOLines(lines) {
   if(!d.po_number) throw new Error('PO number not found.');
   d.po_date='';
   for(const ln of lines){const m=ln.match(/Date\s*:\s*(\d{2}-\d{2}-\d{4})/);if(m){const[dd,mm,yyyy]=m[1].split('-');d.po_date=`${dd}.${mm}.${yyyy}`;break;}}
-  d.gstin='';
-  for(const ln of lines){const m=ln.match(/GSTIN\s*:(\w+)/);if(m){d.gstin=m[1];break;}}
-  d.consignee='Nexon Omniverse Limited';
+  // Detect consignee + address + GSTIN — Bhiwandi POs now use ETHNIQ RETAIL; others use Nexon/AWL
+  const isEthniq=lines.some(ln=>ln.includes('ETHNIQ RETAIL'));
   const addr=[]; let cap=false;
-  for(const ln of lines){
-    if(ln.includes('AWL INDIA PVT LTD')){addr.push(ln.trim());cap=true;continue;}
-    if(cap){if(!ln.trim()||/CIN|GSTIN|Vendor|Order No/.test(ln)){cap=false;break;}addr.push(ln.trim());}
+  if(isEthniq){
+    d.consignee='ETHNIQ RETAIL PRIVATE LIMITED - BHIWANDI';
+    d.gstin='27AAJCE5366P1ZV';  // Ethniq Retail Bhiwandi GSTIN
+    for(const ln of lines){
+      if(ln.includes('ETHNIQ RETAIL')){cap=true;continue;}
+      if(cap){if(!ln.trim()||/GSTIN|GST NO|CIN|Vendor|Order No/.test(ln)){cap=false;break;}addr.push(ln.trim());}
+    }
+  } else {
+    d.consignee='Nexon Omniverse Limited';
+    d.gstin='';
+    for(const ln of lines){const m=ln.match(/GSTIN\s*:(\w+)/);if(m){d.gstin=m[1];break;}}
+    for(const ln of lines){
+      if(ln.includes('AWL INDIA PVT LTD')){addr.push(ln.trim());cap=true;continue;}
+      if(cap){if(!ln.trim()||/CIN|GSTIN|Vendor|Order No/.test(ln)){cap=false;break;}addr.push(ln.trim());}
+    }
   }
   d.address=addr.slice(0,5);
+  d.isEthniq=isEthniq;
   d.igst_rate=0.05;
   for(const ln of lines){const m=ln.match(/IGST.*?@\s*(\d+(?:\.\d+)?)%/);if(m){d.igst_rate=parseFloat(m[1])/100;break;}}
   const items=[]; let i=0;
@@ -382,7 +394,7 @@ function todayStr(){
 // ── Fill XLSX via ZIP/XML (styles preserved perfectly) ────────────────────────
 async function generateXLSX(data, invNo, pcsPerCarton) {
   const MAX_CARTONS = 200;
-  const {po_number,po_date,gstin,consignee,address,items,total_qty,total_amt,igst_rate,igst_amt,grand}=data;
+  const {po_number,po_date,gstin,consignee,address,items,total_qty,total_amt,igst_rate,igst_amt,grand,isEthniq}=data;
   const cartons=computeCartons(items,pcsPerCarton);
   const n=cartons.length;
   if(n>MAX_CARTONS) throw new Error(`This PO needs ${n} cartons, but the template supports up to ${MAX_CARTONS}. Contact support.`);
@@ -445,12 +457,28 @@ async function generateXLSX(data, invNo, pcsPerCarton) {
   inv=setCell(inv,A(T+3,13),fmtAmt(0));             // N35 MRP Value
   inv=setCell(inv,A(T+4,13),fmtAmt(total_amt));     // N36 Assessable Value
   inv=setCell(inv,A(T+5,13),fmtAmt(0));             // N37 blank
-  inv=setCell(inv,A(T+6,11),`${Math.round(igst_rate*100)}%`); // L38 IGST rate
-  inv=setCell(inv,A(T+6,13),fmtAmt(igst_amt));      // N38 IGST amount
-  inv=setCell(inv,A(T+9,13),fmtAmt(0));             // N41 Round off
-  inv=setCell(inv,A(T+10,13),fmtAmt(grand));        // N42 Grand total
-  inv=setCell(inv,A(T+11,0),`Amount Chargeable ( in Words ) : ${numToWords(grand)} ONLY.`);
-  inv=setCell(inv,A(T+12,0),`IGST Amount ( in words) : ${numToWords(igst_amt)} ONLY.`);
+  if(isEthniq){
+    const sgst_amt=Math.round(igst_amt/2);
+    const cgst_amt=igst_amt-sgst_amt;
+    const half_pct=(igst_rate*50).toFixed(1)+'%';  // e.g. 5% → "2.5%"
+    inv=setCell(inv,A(T+6,6),'SGST');               // G38 label
+    inv=setCell(inv,A(T+6,11),half_pct);            // L38 SGST rate
+    inv=setCell(inv,A(T+6,13),fmtAmt(sgst_amt));   // N38 SGST amount
+    inv=setCell(inv,A(T+7,6),'CGST');              // G39 label
+    inv=setCell(inv,A(T+7,11),half_pct);            // L39 CGST rate
+    inv=setCell(inv,A(T+7,13),fmtAmt(cgst_amt));   // N39 CGST amount
+    inv=setCell(inv,A(T+9,13),fmtAmt(0));          // N41 Round off
+    inv=setCell(inv,A(T+10,13),fmtAmt(grand));     // N42 Grand total
+    inv=setCell(inv,A(T+11,0),`Amount Chargeable ( in Words ) : ${numToWords(grand)} ONLY.`);
+    inv=setCell(inv,A(T+12,0),`SGST Amount ( in words) : ${numToWords(sgst_amt)} ONLY. CGST Amount : ${numToWords(cgst_amt)} ONLY.`);
+  } else {
+    inv=setCell(inv,A(T+6,11),`${Math.round(igst_rate*100)}%`); // L38 IGST rate
+    inv=setCell(inv,A(T+6,13),fmtAmt(igst_amt));      // N38 IGST amount
+    inv=setCell(inv,A(T+9,13),fmtAmt(0));             // N41 Round off
+    inv=setCell(inv,A(T+10,13),fmtAmt(grand));        // N42 Grand total
+    inv=setCell(inv,A(T+11,0),`Amount Chargeable ( in Words ) : ${numToWords(grand)} ONLY.`);
+    inv=setCell(inv,A(T+12,0),`IGST Amount ( in words) : ${numToWords(igst_amt)} ONLY.`);
+  }
 
   zip.file('xl/worksheets/sheet1.xml',inv);
 
@@ -789,7 +817,9 @@ btn.addEventListener('click',async()=>{
 `+
       `Total Qty: ${data.total_qty.toLocaleString('en-IN')} pcs   |   Grand Total: ₹${data.grand.toLocaleString('en-IN')}
 `+
-      `IGST: ₹${data.igst_amt.toLocaleString('en-IN')} @ ${(data.igst_rate*100).toFixed(0)}%`,
+      (data.isEthniq
+        ? `SGST: ₹${Math.round(data.igst_amt/2).toLocaleString('en-IN')} @ 2.5%   |   CGST: ₹${(data.igst_amt-Math.round(data.igst_amt/2)).toLocaleString('en-IN')} @ 2.5%`
+        : `IGST: ₹${data.igst_amt.toLocaleString('en-IN')} @ ${(data.igst_rate*100).toFixed(0)}%`),
       'ok'
     );
   }catch(e){
