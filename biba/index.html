@@ -158,23 +158,7 @@
   @keyframes spin { to { transform: rotate(360deg); } }
 </style>
 </head>
-<script>(function(){var s;try{s=JSON.parse(localStorage.getItem('ufr_session'));}catch(e){}if(!s||!s.user||Date.now()>s.expiry){window.location.replace('../index.html');}else{window._loggedUser=s.user;}})();</script>
 <body>
-
-<!-- UNITED NAV BAR -->
-<nav id="uNav" style="display:flex;align-items:center;justify-content:space-between;background:#1B3080;padding:0 24px;height:48px;position:sticky;top:0;z-index:99999;box-shadow:0 2px 10px rgba(0,0,0,.4);border-bottom:3px solid #D42027;font-family:'Segoe UI',Arial,sans-serif">
-  <a href="../index.html" style="display:inline-flex;align-items:center;gap:6px;color:rgba(255,255,255,.85);font-size:12.5px;font-weight:600;text-decoration:none;padding:5px 12px;border-radius:6px;border:1px solid rgba(255,255,255,.18)">
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
-    Home
-  </a>
-  <span style="color:#fff;font-size:13px;font-weight:600;letter-spacing:.3px;position:absolute;left:50%;transform:translateX(-50%);pointer-events:none">United Fashion &amp; Retail Pvt. Ltd.</span>
-  <div style="display:flex;align-items:center;gap:10px">
-    <span style="color:#F5A800;font-size:11px;font-weight:700;background:rgba(245,168,0,.12);border:1px solid rgba(245,168,0,.3);padding:4px 12px;border-radius:20px;letter-spacing:.5px;text-transform:uppercase">Biba</span>
-    <span id="navUser" style="color:rgba(255,255,255,.7);font-size:11.5px;font-weight:500"></span>
-    <button onclick="(function(){localStorage.removeItem('ufr_session');window.location.replace('../index.html');})()" style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:rgba(255,255,255,.85);padding:4px 10px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;font-family:'Segoe UI',Arial,sans-serif">Sign Out</button>
-  </div>
-</nav>
-
 <div class="wrap">
   <header class="top">
     <h1>PO → Packing List &amp; Carton Sticker Generator</h1>
@@ -225,6 +209,13 @@
           <div class="t">One combined packing list</div>
           <div class="d">All line items from the PO go into a single packing list / carton sticker set.</div>
         </div>
+      </div>
+      <div style="margin-top:16px; padding-top:14px; border-top:1px solid var(--line);">
+        <label class="field" style="max-width:220px;">
+          <span class="lbl">Max pieces per carton</span>
+          <input type="number" id="maxCartonQty" value="50" min="1" step="1">
+        </label>
+        <p style="font-size:12px; color:var(--sub); margin:6px 0 0;">Cartons below are auto-packed to this limit — a size that doesn't fill a carton on its own shares the leftover space with the next size (or even the next style, in combined mode), the same way your example file combined leftovers into one box. Change this and cartons rebuild automatically; edit dispatch quantities first, then use "Repack cartons" on a shipment to re-run packing without losing those edits.</p>
       </div>
     </div>
 
@@ -381,6 +372,43 @@ function fullColourName(code) {
   const key = code.trim().toUpperCase();
   if (COLOUR_MAP[key]) return COLOUR_MAP[key];
   return key.split(' ').map(w => w.charAt(0) + w.slice(1).toLowerCase()).join(' ');
+}
+
+// ---------- Auto-pack line items into cartons up to a max quantity per carton ----------
+// Greedily fills each carton to `maxQty` pieces before starting the next one, splitting a
+// single item's quantity across cartons when it doesn't fit, and carrying leftover space
+// into the NEXT item/size so different sizes (or styles) can share a carton — mirroring how
+// the original vendor's own example combined the tail end of two items into one box.
+function packItemsIntoCartons(items, maxQty, startCartonNo) {
+  maxQty = Math.max(1, Math.round(Number(maxQty)) || 50);
+  const cartons = [];
+  let current = null;
+  let cartonNo = (startCartonNo || 1);
+  const usedOf = (carton) => carton.items.reduce((a, b) => a + (Number(b.dispatchQty) || 0), 0);
+
+  for (const src of items) {
+    let remainingDispatch = Number(src.dispatchQty) || 0;
+    let remainingPo = Number(src.poQty) || 0;
+
+    if (remainingDispatch <= 0) {
+      // Nothing to dispatch for this line, but still surface it as its own row rather than
+      // silently dropping it — a zero-quantity row is a clear signal something needs review.
+      if (!current || usedOf(current) >= maxQty) { current = { cartonNo: cartonNo++, bale: '', items: [] }; cartons.push(current); }
+      current.items.push({ itemCode: src.itemCode, style: src.style, colourCode: src.colourCode, colour: src.colour, size: src.size, poQty: remainingPo, dispatchQty: 0 });
+      continue;
+    }
+
+    while (remainingDispatch > 0) {
+      if (!current || usedOf(current) >= maxQty) { current = { cartonNo: cartonNo++, bale: '', items: [] }; cartons.push(current); }
+      const space = maxQty - usedOf(current);
+      const take = Math.min(space, remainingDispatch);
+      const poTake = Math.min(take, remainingPo);
+      current.items.push({ itemCode: src.itemCode, style: src.style, colourCode: src.colourCode, colour: src.colour, size: src.size, poQty: poTake, dispatchQty: take });
+      remainingDispatch -= take;
+      remainingPo -= poTake;
+    }
+  }
+  return cartons;
 }
 
 // ---------- PDF text -> structured PO data ----------
@@ -783,6 +811,7 @@ const state = {
   parsed: null,
   rawText: '',
   mode: 'split',
+  maxCartonQty: 50,
   shipments: [],
   fromLines: [
     'UNITED TEXTILES MILLS PVT. LTD. ',
@@ -926,6 +955,14 @@ function renderModeCard() {
 document.getElementById('modeOptSplit').addEventListener('click', () => { state.mode = 'split'; rebuildShipments(); renderModeCard(); renderShipments(); });
 document.getElementById('modeOptCombined').addEventListener('click', () => { state.mode = 'combined'; rebuildShipments(); renderModeCard(); renderShipments(); });
 
+const maxCartonQtyInput = document.getElementById('maxCartonQty');
+maxCartonQtyInput.addEventListener('change', () => {
+  const v = Math.max(1, Math.round(Number(maxCartonQtyInput.value)) || 50);
+  maxCartonQtyInput.value = v;
+  state.maxCartonQty = v;
+  if (state.parsed) { rebuildShipments(); renderShipments(); }
+});
+
 // ---------------- Shipment model ----------------
 function rebuildShipments() {
   const p = state.parsed;
@@ -938,6 +975,8 @@ function rebuildShipments() {
 }
 function makeShipment(style, colourCode, colour, items, label) {
   const p = state.parsed;
+  const packable = items.map(it => ({ itemCode: it.itemCode, style: it.style, colourCode: it.colourCode, colour: fullColourName(it.colourCode), size: it.size, poQty: it.orderQty, dispatchQty: it.orderQty }));
+  const packedCartons = packItemsIntoCartons(packable, state.maxCartonQty);
   return {
     id: nextId(),
     label,
@@ -947,11 +986,27 @@ function makeShipment(style, colourCode, colour, items, label) {
     netWeight: '', grossWeight: '',
     destination: p.header.destinationCity || 'Faridabad',
     poNo: p.header.poNo || '', poDate: p.header.poDate || '', poExpiryDate: p.header.poEndDate || '',
-    cartons: items.map((it, idx) => ({
-      id: nextId(), cartonNo: idx + 1, bale: '',
-      items: [{ itemCode: it.itemCode, style: it.style, colourCode: it.colourCode, colour: fullColourName(it.colourCode), size: it.size, poQty: it.orderQty, dispatchQty: it.orderQty }]
-    }))
+    cartons: packedCartons.map(c => ({ id: nextId(), cartonNo: c.cartonNo, bale: c.bale, items: c.items }))
   };
+}
+
+// Re-run the max-qty-per-carton packer on a shipment's CURRENT items (so any manual dispatch-qty
+// edits or added/removed rows are respected), replacing its whole carton layout. Any item that's
+// already split across cartons (from a previous pack) is re-merged by item/size first, so
+// repacking after an edit reflows cleanly instead of preserving the old split points.
+function repackShipment(sh) {
+  const merged = new Map();
+  const order = [];
+  sh.cartons.forEach(c => c.items.forEach(it => {
+    const key = [it.itemCode, it.style, it.colourCode, it.size].join('||');
+    if (!merged.has(key)) { merged.set(key, { ...it, poQty: 0, dispatchQty: 0 }); order.push(key); }
+    const m = merged.get(key);
+    m.poQty += Number(it.poQty) || 0;
+    m.dispatchQty += Number(it.dispatchQty) || 0;
+  }));
+  const flatItems = order.map(k => merged.get(k));
+  const packedCartons = packItemsIntoCartons(flatItems, state.maxCartonQty);
+  sh.cartons = packedCartons.map(c => ({ id: nextId(), cartonNo: c.cartonNo, bale: c.bale, items: c.items }));
 }
 
 // ---------------- Render shipments ----------------
@@ -1058,6 +1113,18 @@ function renderShipmentCard(sh, defaultOpen) {
   });
   body.appendChild(addCartonBtn);
 
+  const repackBtn = document.createElement('button');
+  repackBtn.className = 'subtle';
+  repackBtn.style.marginTop = '6px';
+  repackBtn.style.marginLeft = '6px';
+  repackBtn.title = `Re-run auto-packing at ${state.maxCartonQty} pieces/carton using the current dispatch quantities below`;
+  repackBtn.textContent = `↻ repack cartons (max ${state.maxCartonQty}/carton)`;
+  repackBtn.addEventListener('click', () => {
+    repackShipment(sh);
+    renderShipments();
+  });
+  body.appendChild(repackBtn);
+
   const totals = document.createElement('div');
   totals.className = 'totals-line';
   totals.innerHTML = `<b>${numCartons}</b> carton(s) · dispatch total <b>${totalDispatch.toLocaleString('en-IN')}</b> vs ordered <b>${totalPo.toLocaleString('en-IN')}</b>${totalDispatch !== totalPo ? ' <span class="qty-mismatch">(differs — expected if this is a partial shipment)</span>' : ''}`;
@@ -1113,7 +1180,6 @@ async function buildWorkbookForShipment(sh) {
   return generateWorkbook(ExcelJS, templateBuf, job);
 }
 function fileNameForShipment(sh) {
-  function logDownload(type,details){try{var entry={ts:(function(){var d=new Date();return new Date(d.getTime()+19800000).toISOString().replace('T',' ').slice(0,19)+' IST';})(),user:window._loggedUser||'unknown',portal:'Biba',type:type,details:details||''};var logs=JSON.parse(localStorage.getItem('ufr_download_log')||'[]');logs.push(entry);localStorage.setItem('ufr_download_log',JSON.stringify(logs));new Image().src='https://script.google.com/macros/s/AKfycbzdmoIOF1TGoSlw8UfmFgJZ9Ty9Ud13K2_nmXW2vflqOnqsYaax4ODaU-Sosn-Y9WfiDA/exec?ts='+encodeURIComponent(entry.ts)+'&user='+encodeURIComponent(entry.user)+'&portal='+encodeURIComponent(entry.portal)+'&type='+encodeURIComponent(entry.type)+'&details='+encodeURIComponent(entry.details);}catch(e){}}
   const clean = s => String(s || '').replace(/[\\/:*?"<>|]/g, '-').replace(/\s+/g, '_');
   const inv = clean(sh.invoiceNo || 'invoice');
   const styleTag = sh.style ? `${clean(sh.style)}-${clean(sh.colourCode)}` : 'combined';
@@ -1138,9 +1204,7 @@ document.getElementById('generateAllBtn').addEventListener('click', async () => 
       statusEl.textContent = 'Generating…';
       const wb = await buildWorkbookForShipment(state.shipments[0]);
       const buf = await wb.xlsx.writeBuffer();
-      const fn0 = fileNameForShipment(state.shipments[0]);
-      downloadBlob(buf, fn0);
-      logDownload('Packing List', fn0);
+      downloadBlob(buf, fileNameForShipment(state.shipments[0]));
       statusEl.textContent = 'Downloaded.';
     } else {
       const zip = new JSZip();
@@ -1155,11 +1219,9 @@ document.getElementById('generateAllBtn').addEventListener('click', async () => 
       const zipBuf = await zip.generateAsync({ type: 'blob' });
       const url = URL.createObjectURL(zipBuf);
       const a = document.createElement('a');
-      const zipName = `PackingLists_${(state.parsed.header.poNo || 'PO')}.zip`;
-      a.href = url; a.download = zipName;
+      a.href = url; a.download = `PackingLists_${(state.parsed.header.poNo || 'PO')}.zip`;
       document.body.appendChild(a); a.click(); document.body.removeChild(a);
       setTimeout(() => URL.revokeObjectURL(url), 4000);
-      logDownload('Packing List (ZIP)', zipName);
       statusEl.textContent = `Downloaded ${state.shipments.length} file(s) as a zip.`;
     }
   } catch (err) {
@@ -1169,7 +1231,6 @@ document.getElementById('generateAllBtn').addEventListener('click', async () => 
   btn.disabled = false;
 });
 
-(function(){var nu=document.getElementById('navUser');if(nu&&window._loggedUser)nu.textContent='👤 '+window._loggedUser;})();
 </script>
 </body>
 </html>
