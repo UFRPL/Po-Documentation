@@ -1,0 +1,741 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Style Union — Wash Care &amp; Price Sticker Generator</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --navy:#1c2b4a; --navy-light:#2d4270; --accent:#c9a24b;
+    --ok:#1a7f3c; --ok-bg:#e8f6ec;
+    --warn:#8a5a00; --warn-bg:#fff6e0;
+    --bad:#a3272c; --bad-bg:#fdecec;
+    --border:#dfe3ea; --muted:#667;
+    --bg:#f5f6f9;
+  }
+  *{box-sizing:border-box;}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;
+    background:var(--bg); margin:0; padding:0; color:#1a1f2b;
+  }
+  header{
+    background:linear-gradient(135deg,var(--navy),var(--navy-light));
+    color:#fff; padding:22px 32px;
+  }
+  header h1{margin:0 0 4px 0; font-size:20px; letter-spacing:.3px;}
+  header p{margin:0; opacity:.85; font-size:13px;}
+  .wrap{max-width:1180px; margin:0 auto; padding:24px 20px 60px;}
+  .card{
+    background:#fff; border:1px solid var(--border); border-radius:10px;
+    padding:20px 22px; margin-bottom:18px; box-shadow:0 1px 2px rgba(20,20,40,.03);
+  }
+  .card h2{font-size:14px; margin:0 0 12px 0; text-transform:uppercase; letter-spacing:.6px; color:var(--navy);}
+  .card h2 small{text-transform:none; letter-spacing:0; color:var(--muted); font-weight:400; margin-left:6px;}
+
+  #dropzone{
+    border:2px dashed #b7c0d1; border-radius:10px; padding:38px 20px;
+    text-align:center; cursor:pointer; transition:.15s; background:#fafbfd;
+  }
+  #dropzone.drag{border-color:var(--accent); background:#fdf8ec;}
+  #dropzone .big{font-size:16px; font-weight:600; margin-bottom:4px;}
+  #dropzone .small{font-size:12.5px; color:var(--muted);}
+  #fileInput{display:none;}
+  #fileName{margin-top:10px; font-size:13px; color:var(--navy); font-weight:600;}
+
+  details summary{cursor:pointer; font-size:13px; font-weight:600; color:var(--navy); padding:4px 0;}
+  .settings-grid{display:grid; grid-template-columns:1fr 1fr; gap:12px 20px; margin-top:14px;}
+  .settings-grid .full{grid-column:1/-1;}
+  label{display:block; font-size:11.5px; font-weight:600; color:var(--muted); margin-bottom:4px; text-transform:uppercase; letter-spacing:.3px;}
+  input[type=text], textarea, select{
+    width:100%; padding:8px 10px; border:1px solid var(--border); border-radius:6px;
+    font-size:13px; font-family:inherit; background:#fff;
+  }
+  textarea{resize:vertical; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:11.5px;}
+
+  .btn{
+    display:inline-flex; align-items:center; gap:6px; padding:9px 16px; border-radius:7px;
+    border:1px solid var(--navy); background:var(--navy); color:#fff; font-size:13px; font-weight:600;
+    cursor:pointer; transition:.15s;
+  }
+  .btn:hover{background:var(--navy-light);}
+  .btn.secondary{background:#fff; color:var(--navy);}
+  .btn.secondary:hover{background:#f0f2f7;}
+  .btn:disabled{opacity:.45; cursor:not-allowed;}
+  .btn.big{padding:13px 22px; font-size:14.5px;}
+  .row-actions{display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:10px;}
+
+  .pill{display:inline-block; padding:2px 9px; border-radius:20px; font-size:11px; font-weight:700;}
+  .pill.ok{background:var(--ok-bg); color:var(--ok);}
+  .pill.warn{background:var(--warn-bg); color:var(--warn);}
+  .pill.bad{background:var(--bad-bg); color:var(--bad);}
+  .pill.muted{background:#eef0f4; color:var(--muted);}
+
+  .summary-bar{display:flex; gap:14px; flex-wrap:wrap; margin-bottom:6px;}
+  .stat{background:#fafbfd; border:1px solid var(--border); border-radius:8px; padding:10px 16px; min-width:110px;}
+  .stat .n{font-size:20px; font-weight:700; color:var(--navy);}
+  .stat .l{font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.3px;}
+
+  table{border-collapse:collapse; width:100%; font-size:12.3px;}
+  th,td{padding:6px 8px; border-bottom:1px solid var(--border); text-align:left; white-space:nowrap;}
+  th{background:#f4f5f9; position:sticky; top:0; font-size:11px; text-transform:uppercase; letter-spacing:.3px; color:var(--muted);}
+  tbody tr:hover{background:#fafcff;}
+  .tablewrap{max-height:480px; overflow:auto; border:1px solid var(--border); border-radius:8px;}
+  .note{font-size:12px; color:var(--muted); margin-top:8px; line-height:1.5;}
+  .banner{border-radius:8px; padding:10px 14px; font-size:12.5px; margin-bottom:12px; line-height:1.5;}
+  .banner.info{background:#eef3fb; color:#20447a; border:1px solid #cfe0f5;}
+  .banner.warn{background:var(--warn-bg); color:var(--warn); border:1px solid #f2dfa0;}
+  .banner.bad{background:var(--bad-bg); color:var(--bad); border:1px solid #f3c6c8;}
+  .hidden{display:none !important;}
+  code{background:#f0f1f4; padding:1px 5px; border-radius:4px; font-size:11.5px;}
+  footer{text-align:center; font-size:11.5px; color:#98a0b3; padding:20px;}
+</style>
+</head>
+<script>(function(){var s;try{s=JSON.parse(localStorage.getItem('ufr_session'));}catch(e){}if(!s||!s.user||Date.now()>s.expiry){window.location.replace('../index.html');}else{window._loggedUser=s.user;}})();</script>
+<body>
+
+<!-- UNITED NAV BAR -->
+<nav id="uNav" style="display:flex;align-items:center;justify-content:space-between;background:#1B3080;padding:0 24px;height:48px;position:sticky;top:0;z-index:99999;box-shadow:0 2px 10px rgba(0,0,0,.4);border-bottom:3px solid #D42027;font-family:'Segoe UI',Arial,sans-serif">
+  <a href="../index.html" style="display:inline-flex;align-items:center;gap:6px;color:rgba(255,255,255,.85);font-size:12.5px;font-weight:600;text-decoration:none;padding:5px 12px;border-radius:6px;border:1px solid rgba(255,255,255,.18)">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+    Home
+  </a>
+  <span style="color:#fff;font-size:13px;font-weight:600;letter-spacing:.3px;position:absolute;left:50%;transform:translateX(-50%);pointer-events:none">United Fashion &amp; Retail Pvt. Ltd.</span>
+  <div style="display:flex;align-items:center;gap:10px">
+    <span style="color:#F5A800;font-size:11px;font-weight:700;background:rgba(245,168,0,.12);border:1px solid rgba(245,168,0,.3);padding:4px 12px;border-radius:20px;letter-spacing:.5px;text-transform:uppercase">Style Union</span>
+    <span id="navUser" style="color:rgba(255,255,255,.7);font-size:11.5px;font-weight:500"></span>
+    <button onclick="(function(){localStorage.removeItem('ufr_session');window.location.replace('../index.html');})()" style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:rgba(255,255,255,.85);padding:4px 10px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;font-family:'Segoe UI',Arial,sans-serif">Sign Out</button>
+  </div>
+</nav>
+
+<header>
+  <h1>Style Union — Wash Care &amp; Price Sticker Generator</h1>
+  <p>Drop the buyer's Style SKU dump → get it converted into wash-care AND price-sticker label formats, cross-checked against the Style Union master sheet.</p>
+</header>
+
+<div class="wrap">
+
+  <div class="card">
+    <h2>1 · Drop the Style SKU dump</h2>
+    <div id="dropzone">
+      <div class="big">Drag &amp; drop the buyer's Style SKU Excel file here</div>
+      <div class="small">or click to choose a file · .xlsx</div>
+      <div id="fileName"></div>
+    </div>
+    <input type="file" id="fileInput" accept=".xlsx,.xls">
+  </div>
+
+  <div class="card">
+    <h2>Label settings <small>constants that go on every wash-care row — edit once, they'll stay for this session</small></h2>
+    <details>
+      <summary>Show / edit settings</summary>
+      <div class="settings-grid">
+        <div>
+          <label>Vendor code</label>
+          <input type="text" id="s_vendorCode" value="10232">
+        </div>
+        <div>
+          <label>Net qty (per pack)</label>
+          <input type="text" id="s_netQty" value="1N">
+        </div>
+        <div>
+          <label>Criteria — topwear</label>
+          <input type="text" id="s_critTop" value="chest size">
+        </div>
+        <div>
+          <label>Criteria — bottomwear</label>
+          <input type="text" id="s_critBottom" value="waist size">
+        </div>
+        <div>
+          <label>Washcare instruction code</label>
+          <input type="text" id="s_washcode" value="100C_W">
+        </div>
+        <div>
+          <label>QR / website</label>
+          <input type="text" id="s_qr" value="www.styleunion.in">
+        </div>
+        <div class="full">
+          <label>Manufactured &amp; marketed by</label>
+          <input type="text" id="s_manuf" value="STYLE UNION a division of Ethnicity Limited, D 101, Synthofine Estate, Goregaon East, Mumbai-400063">
+        </div>
+        <div class="full">
+          <label>Customer care number</label>
+          <input type="text" id="s_care" value="+917304053032,  sharewithus@stylemail.in">
+        </div>
+        <div>
+          <label><input type="checkbox" id="s_includeMrp" style="width:auto; display:inline; margin-right:6px;">Include MRP from dump on wash-care label</label>
+        </div>
+        <div>
+          <label><input type="checkbox" id="s_skipInactive" checked style="width:auto; display:inline; margin-right:6px;">Skip rows marked Inactive in dump</label>
+        </div>
+        <div>
+          <label>Size range (price sticker)</label>
+          <input type="text" id="s_sizeRange" value="S-XXL">
+        </div>
+        <div class="full">
+          <label>Marketed by (price sticker)</label>
+          <input type="text" id="s_marketedBy" value="Style Union a division of Ethnicity Limited D-201, Synthofine Estate, Off Aarey Road, Goregaon (E), Mumbai 400063">
+        </div>
+      </div>
+      <p class="note">
+        <strong>Quantity</strong> (pcs per size) and <strong>MRP</strong> aren't reliably in the buyer's Style SKU dump, so they're
+        left blank below — type them straight into the review table once you have them from the PO/price list, and both the
+        wash-care file (Quantity) and the price sticker (RFID Quantity / MRP) will use what you typed. Everything else is filled in automatically.
+      </p>
+    </details>
+  </div>
+
+  <div class="card" id="verifyCard">
+    <h2>2 · Verify against the Style Union master sheet <small>catches wrong style numbers / colors before they go to the wash-care vendor</small></h2>
+    <div id="verifyBanner" class="banner info">
+      Checks each row's <strong>Style No + Color</strong> against your
+      <a href="https://docs.google.com/spreadsheets/d/17pVNntsM77m5jZ4UbUc2zHL20PELoEn5b5pT_2QxQiw/edit" target="_blank" rel="noopener">Style Union Google Sheet</a>
+      ("ratio" tab). Composition %, MRP and wash-instruction text aren't checked — the sheet doesn't hold a reliable master for those per style, so those fields pass through from the dump as-is.
+    </div>
+    <div class="row-actions">
+      <button class="btn secondary" id="btnLiveVerify" disabled>Try live check</button>
+      <span style="font-size:12px; color:var(--muted)">If your browser blocks the live check (common when opening this file directly, e.g. via <code>file://</code>), paste the sheet data instead:</span>
+    </div>
+    <details style="margin-top:10px;">
+      <summary>Paste reference data manually</summary>
+      <p class="note">Open the <a href="https://docs.google.com/spreadsheets/d/17pVNntsM77m5jZ4UbUc2zHL20PELoEn5b5pT_2QxQiw/edit" target="_blank" rel="noopener">Google Sheet</a>, go to the <strong>ratio</strong> tab, select all (Ctrl/Cmd+A), copy, and paste below.</p>
+      <textarea id="pasteArea" rows="6" placeholder="Paste the sheet's cells here (tab-separated, straight from a copy/paste out of Google Sheets)"></textarea>
+      <div class="row-actions">
+        <button class="btn secondary" id="btnUsePaste">Use pasted data</button>
+        <span id="pasteStatus" style="font-size:12px; color:var(--muted)"></span>
+      </div>
+    </details>
+  </div>
+
+  <div class="card hidden" id="resultsCard">
+    <h2>3 · Review &amp; download</h2>
+    <div class="summary-bar" id="summaryBar"></div>
+    <div class="tablewrap">
+      <table id="resultsTable">
+        <thead></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="row-actions">
+      <button class="btn big" id="btnDownload">⬇ Download wash care .xlsx</button>
+      <button class="btn big secondary" id="btnDownloadPrice">⬇ Download price sticker .xlsx</button>
+      <span id="downloadStatus" style="font-size:12.5px; color:var(--muted)"></span>
+    </div>
+  </div>
+
+</div>
+
+<footer>Runs entirely in your browser — the dump file never leaves your computer, and one review table drives both the wash-care and price-sticker downloads. Only the reference check calls out to Google Sheets.</footer>
+
+<script>
+const OUTPUT_HEADERS = [
+  "BARCODE","Style no","ARTICLE DESCRIPTION","PRODUCT","COLOR","FIT SIZE",
+  "ITEM CODE","NET QTY","CRITERIYA","SIZE IN CM","MRP","Manufactured & Marketed By",
+  "Customer Care Number","QR Code","Fabric Content","Washcare instructions","Quantity",
+  "VENDOR NAME","VENDOR CODE"
+];
+
+// price sticker uses the exact column names/order from your Price_Sticker sample file
+const PRICE_HEADERS = [
+  "BARCODE","Style","ARTICLE DESCRIPTION","PRODUCT","COLOR","SIZE","ITEM CODE","NET QTY",
+  "CRITERIA","MRP","SIZE IN CM","QR Code","Size Range","RFID Quantity","VENDOR NAME",
+  "VENDOR Code","Marketed by"
+];
+
+const SHEET_ID = "17pVNntsM77m5jZ4UbUc2zHL20PELoEn5b5pT_2QxQiw";
+const SHEET_GID = "1821049019"; // "ratio" tab
+
+// ---------- header aliasing for the incoming buyer dump ----------
+const FIELD_ALIASES = {
+  styleNo:      ["style number","style no","style"],
+  colorway:     ["colorway","color","colour"],
+  size:         ["size"],
+  skuErpCode:   ["sku erp code","item code","erp code"],
+  eanCode:      ["ean code","barcode","ean"],
+  skuDesc:      ["sku description","article description"],
+  subDept:      ["sub-department","sub department","subdepartment","product"],
+  composition:  ["composition","fabric content"],
+  sizeInCm:     ["size in cm","size(cm)","size cm"],
+  vendor:       ["production","vendor name","manufacturer"],
+  mrp:          ["mrp"],
+  washInstr:    ["wash instruction","washcare instructions","wash instructions"],
+  active:       ["active"]
+};
+
+function normHeader(h){
+  return String(h||"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
+}
+
+function buildHeaderMap(headerRow){
+  const norm = headerRow.map(normHeader);
+  const map = {};
+  for(const key in FIELD_ALIASES){
+    const aliases = FIELD_ALIASES[key];
+    let idx = -1;
+    for(const a of aliases){
+      idx = norm.indexOf(a);
+      if(idx !== -1) break;
+    }
+    map[key] = idx;
+  }
+  return map;
+}
+
+function cell(row, idx){
+  if(idx === -1 || idx == null) return "";
+  const v = row[idx];
+  return v == null ? "" : String(v).trim();
+}
+
+function formatSizeCm(raw){
+  if(!raw) return "";
+  const n = parseFloat(String(raw).replace(/[^\d.]/g,""));
+  if(isNaN(n)) return String(raw);
+  if(n >= 100) return (n/100).toFixed(2) + " M";
+  return Math.round(n) + " CM";
+}
+
+function formatComposition(s){
+  if(!s) return "";
+  return String(s).replace(/,/g," ").replace(/\s+/g," ").trim().toUpperCase();
+}
+
+function isBottomwear(subDept, styleNo){
+  const t = (subDept||"").toUpperCase() + " " + (styleNo||"").toUpperCase();
+  return /PANT|TROUSER|PALAZZO|BOTTOM|LEGGING|SKIRT|EPT\d|PT\d/.test(t);
+}
+
+// buyer dumps commonly spell out XXXL/XXXXL; wash-care labels use 3XL/4XL/5XL
+const SIZE_LABEL_MAP = { "XXXL":"3XL", "XXXXL":"4XL", "XXXXXL":"5XL", "XXXXXXL":"6XL" };
+function normalizeSizeLabel(s){
+  const key = String(s||"").trim().toUpperCase();
+  return SIZE_LABEL_MAP[key] || key;
+}
+
+// ---------- state ----------
+let inputRows = [];      // raw parsed rows (array of arrays)
+let headerMap = {};
+let outputRows = [];     // built rows: {cells:[...], styleNo, color, status, statusMsg}
+let refPairs = null;     // Map styleNo(upper) -> Set of colors seen in reference
+let refRawText = "";
+let uidCounter = 1;
+// Quantity / Price-MRP are typed in by hand and must survive re-builds (e.g. when a
+// setting changes). Keyed by style+color+size+item code so edits reattach to the same row.
+const userEdits = new Map();
+function editKey(styleNo, color, size, itemCode){
+  return [styleNo,color,size,itemCode].join("|").toUpperCase();
+}
+
+const $ = id => document.getElementById(id);
+
+// ---------- drag & drop / file picking ----------
+const dropzone = $("dropzone");
+const fileInput = $("fileInput");
+dropzone.addEventListener("click", () => fileInput.click());
+["dragenter","dragover"].forEach(evt =>
+  dropzone.addEventListener(evt, e => { e.preventDefault(); dropzone.classList.add("drag"); })
+);
+["dragleave","drop"].forEach(evt =>
+  dropzone.addEventListener(evt, e => { e.preventDefault(); dropzone.classList.remove("drag"); })
+);
+dropzone.addEventListener("drop", e => {
+  const f = e.dataTransfer.files[0];
+  if(f) handleFile(f);
+});
+fileInput.addEventListener("change", e => {
+  const f = e.target.files[0];
+  if(f) handleFile(f);
+});
+
+function handleFile(file){
+  $("fileName").textContent = "Loaded: " + file.name;
+  const reader = new FileReader();
+  reader.onload = evt => {
+    const data = new Uint8Array(evt.target.result);
+    const wb = XLSX.read(data, {type:"array"});
+    const sheet = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(sheet, {header:1, raw:false, defval:""});
+    if(!rows.length){ alert("Couldn't find any rows in that file."); return; }
+    headerMap = buildHeaderMap(rows[0]);
+    inputRows = rows.slice(1).filter(r => r.some(c => String(c).trim() !== ""));
+    if(headerMap.styleNo === -1){
+      alert("Couldn't find a 'Style Number' column in this file — is it a Style SKU dump?");
+      return;
+    }
+    buildOutput();
+    $("btnLiveVerify").disabled = false;
+    runVerification(); // attempt live check automatically
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// ---------- build output rows from settings + input ----------
+function buildOutput(){
+  const vendorCode = $("s_vendorCode").value.trim();
+  const netQty = $("s_netQty").value.trim();
+  const critTop = $("s_critTop").value.trim();
+  const critBottom = $("s_critBottom").value.trim();
+  const washcode = $("s_washcode").value.trim();
+  const qr = $("s_qr").value.trim();
+  const manuf = $("s_manuf").value.trim();
+  const care = $("s_care").value.trim();
+  const includeMrp = $("s_includeMrp").checked;
+  const skipInactive = $("s_skipInactive").checked;
+
+  outputRows = [];
+  for(const row of inputRows){
+    const activeVal = cell(row, headerMap.active);
+    if(skipInactive && activeVal && /^false$/i.test(activeVal)) continue;
+
+    const styleNo   = cell(row, headerMap.styleNo);
+    const color     = cell(row, headerMap.colorway);
+    const size      = normalizeSizeLabel(cell(row, headerMap.size));
+    const subDept   = cell(row, headerMap.subDept);
+    const vendorRaw = cell(row, headerMap.vendor);
+    const sizeInCmRaw = cell(row, headerMap.sizeInCm);
+
+    const rec = {
+      "BARCODE": cell(row, headerMap.eanCode),
+      "Style no": styleNo,
+      "ARTICLE DESCRIPTION": cell(row, headerMap.skuDesc),
+      "PRODUCT": subDept,
+      "COLOR": color,
+      "FIT SIZE": size,
+      "ITEM CODE": cell(row, headerMap.skuErpCode),
+      "NET QTY": netQty,
+      "CRITERIYA": isBottomwear(subDept, styleNo) ? critBottom : critTop,
+      "SIZE IN CM": formatSizeCm(sizeInCmRaw),
+      "MRP": includeMrp ? cell(row, headerMap.mrp) : "",
+      "Manufactured & Marketed By": manuf,
+      "Customer Care Number": care,
+      "QR Code": qr,
+      "Fabric Content": formatComposition(cell(row, headerMap.composition)),
+      "Washcare instructions": washcode,
+      "Quantity": "",
+      "VENDOR NAME": vendorRaw || "",
+      "VENDOR CODE": vendorCode
+    };
+
+    const itemCode = rec["ITEM CODE"];
+    const key = editKey(styleNo, color, size, itemCode);
+    const saved = userEdits.get(key);
+    if(saved){
+      rec["Quantity"] = saved.quantity || "";
+    }
+
+    outputRows.push({
+      uid: uidCounter++,
+      cells: rec, styleNo, color, size, sizeInCmRaw,
+      priceMrp: saved ? (saved.priceMrp || "") : "",
+      status:"unchecked", statusMsg:"Not yet checked against master sheet",
+      dqWarning: null
+    });
+  }
+  sortByStyleThenSize();
+  flagSuspiciousSizeCm();
+  renderTable();
+}
+
+// Group rows by style (in the order styles first appear in the dump), and within
+// each style order by size: S, M, L, XL, XXL, 3XL, 4XL... anything unrecognized
+// sorts after the known sizes, in the order it was encountered.
+const SIZE_RANK = { "XXS":0, "XS":1, "S":2, "M":3, "L":4, "XL":5, "XXL":6, "2XL":6,
+  "3XL":7, "4XL":8, "5XL":9, "6XL":10 };
+function sizeRank(size){
+  const key = String(size||"").trim().toUpperCase();
+  return key in SIZE_RANK ? SIZE_RANK[key] : 999;
+}
+function sortByStyleThenSize(){
+  const styleOrder = new Map();
+  outputRows.forEach(r => { if(!styleOrder.has(r.styleNo)) styleOrder.set(r.styleNo, styleOrder.size); });
+  outputRows.forEach((r,i) => { r._origIndex = i; });
+  outputRows.sort((a,b) => {
+    const so = styleOrder.get(a.styleNo) - styleOrder.get(b.styleNo);
+    if(so !== 0) return so;
+    const sr = sizeRank(a.size) - sizeRank(b.size);
+    if(sr !== 0) return sr;
+    return a._origIndex - b._origIndex; // stable fallback for unrecognized/duplicate sizes
+  });
+}
+
+// Internal sanity check (no external data needed): if a style has more than one
+// distinct Fit Size but the "Size in cm" value is identical across all of them,
+// that's almost certainly a copy-paste error in the buyer's dump.
+function flagSuspiciousSizeCm(){
+  const byStyle = new Map();
+  for(const r of outputRows){
+    if(!byStyle.has(r.styleNo)) byStyle.set(r.styleNo, []);
+    byStyle.get(r.styleNo).push(r);
+  }
+  for(const [styleNo, rows] of byStyle){
+    const distinctSizes = new Set(rows.map(r => r.size).filter(Boolean));
+    const distinctCm = new Set(rows.map(r => (r.sizeInCmRaw||"").trim()).filter(Boolean));
+    if(distinctSizes.size > 1 && distinctCm.size === 1){
+      for(const r of rows){
+        r.dqWarning = `Size in cm (${rows[0].sizeInCmRaw}) is identical across all ${distinctSizes.size} sizes of ${styleNo} in the dump — looks like a copy-paste error, please confirm with the buyer.`;
+      }
+    }
+  }
+}
+
+// re-run mapping if settings change after a file is already loaded
+// (typed-in Quantity / Price MRP survive this via the userEdits map)
+["s_vendorCode","s_netQty","s_critTop","s_critBottom","s_washcode","s_qr","s_manuf","s_care",
+ "s_includeMrp","s_skipInactive","s_sizeRange","s_marketedBy"]
+  .forEach(id => $(id).addEventListener("change", () => { if(inputRows.length){ buildOutput(); applyVerificationToRows(); } }));
+
+// ---------- CSV parsing (quote-aware) ----------
+function parseDelimited(text){
+  // handles both comma-CSV (from gviz) and tab-separated (pasted from Sheets)
+  const rows = [];
+  let row = [], field = "", inQuotes = false;
+  const delim = text.indexOf("\t") !== -1 && text.indexOf(",") === -1 ? "\t" :
+                (text.split("\n")[0].split(",").length > text.split("\n")[0].split("\t").length ? "," : "\t");
+  for(let i=0;i<text.length;i++){
+    const c = text[i];
+    if(inQuotes){
+      if(c === '"'){
+        if(text[i+1] === '"'){ field += '"'; i++; }
+        else inQuotes = false;
+      } else field += c;
+    } else {
+      if(c === '"') inQuotes = true;
+      else if(c === delim){ row.push(field); field = ""; }
+      else if(c === "\n"){ row.push(field); rows.push(row); row=[]; field=""; }
+      else if(c === "\r"){ /* skip */ }
+      else field += c;
+    }
+  }
+  if(field.length || row.length){ row.push(field); rows.push(row); }
+  return rows;
+}
+
+function buildRefIndex(rows){
+  // Map styleNo(upper, trimmed) -> Set of color-ish strings found in the same row
+  const stylePat = /^[A-Z]{2,6}\d{3,6}(\/[0-9]+)?$/i;
+  const idx = new Map();
+  for(const r of rows){
+    const styleCells = [];
+    r.forEach((v,i) => { if(stylePat.test(String(v||"").trim())) styleCells.push({i, v:String(v).trim().toUpperCase()}); });
+    if(!styleCells.length) continue;
+    for(const sc of styleCells){
+      if(!idx.has(sc.v)) idx.set(sc.v, new Set());
+      r.forEach((v,i) => {
+        if(i === sc.i) return;
+        const s = String(v||"").trim();
+        if(s && /[A-Za-z]{3,}/.test(s) && s.length < 40 && !/^\d+%?$/.test(s)) {
+          idx.get(sc.v).add(s.toUpperCase());
+        }
+      });
+    }
+  }
+  return idx;
+}
+
+function runVerification(){
+  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&gid=${SHEET_GID}`;
+  showVerifyBanner("info", "Checking live against the Google Sheet…");
+  fetch(url).then(r => {
+    if(!r.ok) throw new Error("HTTP " + r.status);
+    return r.text();
+  }).then(text => {
+    refRawText = text;
+    refPairs = buildRefIndex(parseDelimited(text));
+    showVerifyBanner("info", `Live check succeeded — matched against ${refPairs.size} style numbers found in the sheet.`);
+    applyVerificationToRows();
+  }).catch(err => {
+    showVerifyBanner("warn",
+      "Couldn't reach the Google Sheet directly from here (this is normal when this file is opened straight from your Desktop — browsers block that for local files). " +
+      "Use \"Paste reference data manually\" below, or open this HTML file through a local server / from Chrome with the extension connected.");
+    applyVerificationToRows(); // still render, just unchecked
+  });
+}
+
+$("btnLiveVerify").addEventListener("click", runVerification);
+
+$("btnUsePaste").addEventListener("click", () => {
+  const text = $("pasteArea").value;
+  if(!text.trim()){ $("pasteStatus").textContent = "Paste something first."; return; }
+  refRawText = text;
+  refPairs = buildRefIndex(parseDelimited(text));
+  $("pasteStatus").textContent = `Loaded ${refPairs.size} style numbers from pasted data.`;
+  showVerifyBanner("info", `Using pasted reference data — matched against ${refPairs.size} style numbers.`);
+  applyVerificationToRows();
+});
+
+function showVerifyBanner(kind, msg){
+  const b = $("verifyBanner");
+  b.className = "banner " + kind;
+  b.innerHTML = msg;
+}
+
+function applyVerificationToRows(){
+  if(!outputRows.length) return;
+  if(refPairs){
+    for(const r of outputRows){
+      const styleKey = (r.styleNo||"").trim().toUpperCase();
+      const colorKey = (r.color||"").trim().toUpperCase();
+      r.sheetSays = "";
+      if(!styleKey){ r.status="warn"; r.statusMsg="No style number"; continue; }
+      if(!refPairs.has(styleKey)){
+        r.status = "bad";
+        r.statusMsg = "Style number not found anywhere in the master sheet — check for a typo.";
+        continue;
+      }
+      const colors = refPairs.get(styleKey);
+      const matched = [...colors].some(c => c === colorKey || c.includes(colorKey) || colorKey.includes(c));
+      if(matched){
+        r.status = "ok";
+        r.statusMsg = "Style + color found in master sheet";
+      } else {
+        r.status = "warn";
+        // The sheet is treated as the source of truth: show exactly what it says instead of a vague "check".
+        r.sheetSays = [...colors].slice(0,4).join(" / ");
+        r.statusMsg = `Sheet says "${r.sheetSays}" for ${r.styleNo} — dump says "${r.color}". Dump looks wrong unless this is a new colorway not yet in the sheet.`;
+      }
+    }
+  } else {
+    for(const r of outputRows){ r.status = "unchecked"; r.statusMsg = "Not checked — no reference data loaded yet"; r.sheetSays = ""; }
+  }
+  renderTable();
+}
+
+// ---------- render ----------
+let showOnlyIssues = false;
+
+function renderTable(){
+  $("resultsCard").classList.remove("hidden");
+  const thead = document.querySelector("#resultsTable thead");
+  const tbody = document.querySelector("#resultsTable tbody");
+  thead.innerHTML = "<tr><th>Master sheet</th><th>Sheet says (if different)</th><th>Data check</th>" +
+    OUTPUT_HEADERS.map(h=>`<th>${h}</th>`).join("") + "<th>Price MRP</th></tr>";
+
+  const rowsToShow = showOnlyIssues
+    ? outputRows.filter(r => r.status === "warn" || r.status === "bad" || r.dqWarning)
+    : outputRows;
+
+  const editableInput = (uid, field, value, width) =>
+    `<input type="text" data-uid="${uid}" data-field="${field}" value="${escapeHtml(value)}" ` +
+    `style="width:${width||70}px; padding:3px 6px; font-size:12px; border:1px solid var(--border); border-radius:4px;">`;
+
+  tbody.innerHTML = rowsToShow.map(r => {
+    const pillClass = r.status === "ok" ? "ok" : r.status === "bad" ? "bad" : r.status === "warn" ? "warn" : "muted";
+    const pillLabel = r.status === "ok" ? "OK" : r.status === "bad" ? "NOT IN SHEET" : r.status === "warn" ? "MISMATCH" : "—";
+    const sheetSaysCell = r.sheetSays
+      ? `<td style="color:var(--warn); font-weight:600;">${escapeHtml(r.sheetSays)}</td>`
+      : `<td style="color:var(--muted);">—</td>`;
+    const dqCell = r.dqWarning
+      ? `<span class="pill warn" title="${escapeHtml(r.dqWarning)}">SUSPECT</span>`
+      : `<span class="pill muted">—</span>`;
+    const cellsHtml = OUTPUT_HEADERS.map(h => {
+      if(h === "Quantity") return `<td>${editableInput(r.uid, "quantity", r.cells["Quantity"])}</td>`;
+      return `<td>${escapeHtml(r.cells[h])}</td>`;
+    }).join("");
+    const priceMrpCell = `<td>${editableInput(r.uid, "priceMrp", r.priceMrp, 60)}</td>`;
+    return `<tr><td title="${escapeHtml(r.statusMsg)}"><span class="pill ${pillClass}">${pillLabel}</span></td>${sheetSaysCell}<td>${dqCell}</td>` +
+      cellsHtml + priceMrpCell + "</tr>";
+  }).join("");
+
+  if(rowsToShow.length === 0 && showOnlyIssues){
+    tbody.innerHTML = `<tr><td colspan="${OUTPUT_HEADERS.length+4}" style="text-align:center; padding:20px; color:var(--ok); font-weight:600;">No mismatches — everything checked out against the sheet.</td></tr>`;
+  }
+
+  const total = outputRows.length;
+  const ok = outputRows.filter(r=>r.status==="ok").length;
+  const warn = outputRows.filter(r=>r.status==="warn").length;
+  const bad = outputRows.filter(r=>r.status==="bad").length;
+  const unchecked = outputRows.filter(r=>r.status==="unchecked").length;
+  const dq = outputRows.filter(r=>r.dqWarning).length;
+  $("summaryBar").innerHTML = `
+    <div class="stat"><div class="n">${total}</div><div class="l">Rows</div></div>
+    <div class="stat"><div class="n" style="color:var(--ok)">${ok}</div><div class="l">Matches sheet</div></div>
+    <div class="stat"><div class="n" style="color:var(--warn)">${warn}</div><div class="l">Color mismatch vs sheet</div></div>
+    <div class="stat"><div class="n" style="color:var(--bad)">${bad}</div><div class="l">Style not in sheet</div></div>
+    ${unchecked ? `<div class="stat"><div class="n">${unchecked}</div><div class="l">Unchecked</div></div>` : ""}
+    ${dq ? `<div class="stat"><div class="n" style="color:var(--warn)">${dq}</div><div class="l">Size-in-cm looks off</div></div>` : ""}
+    <div class="stat" style="cursor:pointer; display:flex; align-items:center; justify-content:center;" id="toggleIssuesBtn">
+      <label style="display:flex; align-items:center; gap:6px; cursor:pointer; text-transform:none; font-size:12.5px; font-weight:600; color:var(--navy); margin:0;">
+        <input type="checkbox" id="issuesOnlyCheck" ${showOnlyIssues ? "checked" : ""} style="width:auto;">
+        Show only mismatches
+      </label>
+    </div>
+  `;
+  const cb = document.getElementById("issuesOnlyCheck");
+  if(cb) cb.addEventListener("change", e => { showOnlyIssues = e.target.checked; renderTable(); });
+}
+
+function escapeHtml(s){
+  return String(s==null?"":s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+
+// Edits to Quantity / Price MRP happen via event delegation on the tbody (attached once,
+// survives table re-renders) so typing doesn't lose focus and edits persist in userEdits.
+document.querySelector("#resultsTable tbody").addEventListener("input", e => {
+  const el = e.target;
+  if(el.tagName !== "INPUT") return;
+  const uid = Number(el.dataset.uid);
+  const field = el.dataset.field;
+  const r = outputRows.find(row => row.uid === uid);
+  if(!r) return;
+  if(field === "quantity") r.cells["Quantity"] = el.value;
+  if(field === "priceMrp") r.priceMrp = el.value;
+  const key = editKey(r.styleNo, r.color, r.size, r.cells["ITEM CODE"]);
+  const existing = userEdits.get(key) || {};
+  userEdits.set(key, { ...existing, quantity: r.cells["Quantity"], priceMrp: r.priceMrp });
+});
+
+// ---------- download ----------
+$("btnDownload").addEventListener("click", () => {
+  if(!outputRows.length){ return; }
+  const aoa = [OUTPUT_HEADERS, ...outputRows.map(r => OUTPUT_HEADERS.map(h => r.cells[h]))];
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws["!cols"] = OUTPUT_HEADERS.map(() => ({wch:18}));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Wash Care");
+  const stamp = new Date().toISOString().slice(0,10);
+  XLSX.writeFile(wb, `wash-care-${stamp}.xlsx`);
+  $("downloadStatus").textContent = "Downloaded wash-care-" + stamp + ".xlsx";
+});
+
+// price sticker reuses most fields already computed for wash care, plus its own
+// settings (Size Range, Marketed by) and the per-row Price MRP typed into the table.
+function buildPriceRow(r){
+  const sizeRange = $("s_sizeRange").value.trim();
+  const marketedBy = $("s_marketedBy").value.trim();
+  return {
+    "BARCODE": r.cells["BARCODE"],
+    "Style": r.cells["Style no"],
+    "ARTICLE DESCRIPTION": r.cells["ARTICLE DESCRIPTION"],
+    "PRODUCT": r.cells["PRODUCT"],
+    "COLOR": r.cells["COLOR"],
+    "SIZE": r.cells["FIT SIZE"],
+    "ITEM CODE": r.cells["ITEM CODE"],
+    "NET QTY": r.cells["NET QTY"],
+    "CRITERIA": r.cells["CRITERIYA"],
+    "MRP": r.priceMrp || "",
+    "SIZE IN CM": r.cells["SIZE IN CM"],
+    "QR Code": r.cells["QR Code"],
+    "Size Range": sizeRange,
+    "RFID Quantity": r.cells["Quantity"] || "",
+    "VENDOR NAME": r.cells["VENDOR NAME"],
+    "VENDOR Code": r.cells["VENDOR CODE"],
+    "Marketed by": marketedBy
+  };
+}
+
+$("btnDownloadPrice").addEventListener("click", () => {
+  if(!outputRows.length){ return; }
+  const missingMrp = outputRows.filter(r => !r.priceMrp).length;
+  const aoa = [PRICE_HEADERS, ...outputRows.map(r => { const p = buildPriceRow(r); return PRICE_HEADERS.map(h => p[h]); })];
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws["!cols"] = PRICE_HEADERS.map(() => ({wch:16}));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Price Sticker");
+  const stamp = new Date().toISOString().slice(0,10);
+  XLSX.writeFile(wb, `price-sticker-${stamp}.xlsx`);
+  $("downloadStatus").textContent = "Downloaded price-sticker-" + stamp + ".xlsx" +
+    (missingMrp ? ` — heads up, ${missingMrp} row(s) have no Price MRP typed in yet.` : "");
+});
+(function(){var nu=document.getElementById('navUser');if(nu&&window._loggedUser)nu.textContent='👤 '+window._loggedUser;})();
+</script>
+</body>
+</html>
