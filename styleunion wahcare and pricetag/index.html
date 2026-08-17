@@ -683,6 +683,9 @@ document.querySelector("#resultsTable tbody").addEventListener("input", e => {
   userEdits.set(key, { ...existing, quantity: r.cells["Quantity"], priceMrp: r.priceMrp });
 });
 
+// ---------- log integration ----------
+function logDownload(type,details){try{var entry={ts:(function(){var d=new Date();return new Date(d.getTime()+19800000).toISOString().replace('T',' ').slice(0,19)+' IST';})(),user:window._loggedUser||'unknown',portal:'Style Union Washcare',type:type,details:details||''};var logs=JSON.parse(localStorage.getItem('ufr_download_log')||'[]');logs.push(entry);localStorage.setItem('ufr_download_log',JSON.stringify(logs));new Image().src='https://script.google.com/macros/s/AKfycbzdmoIOF1TGoSlw8UfmFgJZ9Ty9Ud13K2_nmXW2vflqOnqsYaax4ODaU-Sosn-Y9WfiDA/exec?ts='+encodeURIComponent(entry.ts)+'&user='+encodeURIComponent(entry.user)+'&portal='+encodeURIComponent(entry.portal)+'&type='+encodeURIComponent(entry.type)+'&details='+encodeURIComponent(entry.details);}catch(e){}}
+
 // ---------- download ----------
 $("btnDownload").addEventListener("click", () => {
   if(!outputRows.length){ return; }
@@ -693,6 +696,7 @@ $("btnDownload").addEventListener("click", () => {
   XLSX.utils.book_append_sheet(wb, ws, "Wash Care");
   const stamp = new Date().toISOString().slice(0,10);
   XLSX.writeFile(wb, `wash-care-${stamp}.xlsx`);
+  logDownload('Wash Care', `wash-care-${stamp}.xlsx`);
   $("downloadStatus").textContent = "Downloaded wash-care-" + stamp + ".xlsx";
 });
 
@@ -732,6 +736,7 @@ $("btnDownloadPrice").addEventListener("click", () => {
   XLSX.utils.book_append_sheet(wb, ws, "Price Sticker");
   const stamp = new Date().toISOString().slice(0,10);
   XLSX.writeFile(wb, `price-sticker-${stamp}.xlsx`);
+  logDownload('Price Sticker', `price-sticker-${stamp}.xlsx`);
   $("downloadStatus").textContent = "Downloaded price-sticker-" + stamp + ".xlsx" +
     (missingMrp ? ` — heads up, ${missingMrp} row(s) have no Price MRP typed in yet.` : "");
 });
